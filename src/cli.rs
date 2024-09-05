@@ -46,19 +46,7 @@ pub struct Command {
 }
 
 pub fn execute_with_args(args: Command) -> Result<()> {
-    let real_start_time_system = SystemTime::now();
-    let start_time_system = if let Some(micros_str) = std::env::var_os("ONEFMT_START_MICROS") {
-        let micros = micros_str
-            .to_str()
-            .context("Failed to parse ONEFMT_START_MICROS")?
-            .parse::<u64>()
-            .context("Failed to parse ONEFMT_START_MICROS")?;
-        UNIX_EPOCH + Duration::from_micros(micros)
-    } else {
-        real_start_time_system
-    };
-
-    let start_time = Instant::now() - real_start_time_system.duration_since(start_time_system)?;
+    let start_time = Instant::now();
 
     env_logger::Builder::new()
         .filter_module("onefmt", args.verbose.log_level_filter())
@@ -81,16 +69,11 @@ pub fn execute_with_args(args: Command) -> Result<()> {
 
     debug!("start onefmt: {:?}", &args);
 
-    debug!("real_start_time_system: {:?}", real_start_time_system);
-    debug!("start_time_system: {:?}", start_time_system);
-
     let global_options = args.global_options;
 
     match args.subcommand {
         SubCommands::Cache(args) => cache_execute_with_args(args, global_options),
-        SubCommands::Format(args) => {
-            format_execute_with_args(args, global_options, start_time_system)
-        }
+        SubCommands::Format(args) => format_execute_with_args(args, global_options),
     }?;
 
     debug!("end onefmt");

@@ -7,6 +7,8 @@ use anyhow::{Context, Error, Result};
 use clap::builder::{IntoResettable, Resettable, ValueHint};
 use clap::Parser;
 use log::{debug, info};
+use nix::unistd::{fork, ForkResult};
+use os_pipe::PipeWriter;
 use serde_json::json;
 use std::env::current_dir;
 use std::fmt::Display;
@@ -14,8 +16,9 @@ use std::io::{stdout, Read, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::mpsc;
+use std::thread::sleep;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use std::{fs, io, process, thread};
+use std::{fs, io, process, thread, time};
 use url::Url;
 use url_serde::{Serde, SerdeUrl};
 
@@ -25,79 +28,68 @@ pub struct FormatArgs {
     pub path: PathBuf,
 }
 
-pub fn format_execute_with_args(
-    args: FormatArgs,
-    global_options: GlobalOptions,
-    start_time_system: SystemTime,
-) -> Result<()> {
+pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions) -> Result<()> {
     let no_quick_magic =
         std::env::var_os("ONEFMT_NO_QUICK_MAGIC").is_some_and(|s| s != "0" && s != "");
-    let inner_quick_magic = std::env::var_os("ONEFMT_NO_QUICK_MAGIC").is_some_and(|s| s == "inner");
 
     debug!("no_quick_magic: {}", no_quick_magic);
-    debug!("inner_quick_magic: {}", inner_quick_magic);
+
+    let mut maybe_write: Option<PipeWriter> = None;
 
     if !no_quick_magic {
-        info!("running quick magic");
-
         let target_path = args.path.canonicalize()?;
 
-        let raw_args = std::env::args().collect::<Vec<_>>();
-        let (exec, args) = raw_args.split_first().unwrap();
+        let (mut reader, mut writer) = os_pipe::pipe()?;
 
-        let mut proc = process::Command::new(exec)
-            .args(args)
-            .env("ONEFMT_NO_QUICK_MAGIC", "inner")
-            .env(
-                "ONEFMT_START_MICROS",
-                start_time_system
-                    .duration_since(UNIX_EPOCH)?
-                    .as_micros()
-                    .to_string(),
-            )
-            .stdout(process::Stdio::piped())
-            .spawn()
-            .context("Failed to execute command")?;
+        info!("open pipe");
 
-        let (tx, rx) = mpsc::channel();
-        let tx0 = tx.clone();
-        let tx1 = tx.clone();
+        match unsafe { fork()? } {
+            ForkResult::Parent { child } => {
+                let metadata = fs::metadata(&target_path)?;
+                let modified_time = metadata.modified()?;
 
-        let thread_waiting_proc = thread::spawn(move || {
-            let buf: &mut [u8] = &mut [0];
-            let _ = proc.stdout.unwrap().read_exact(buf);
-            info!("proc stdout read done");
-            tx0.send(1).unwrap();
-        });
+                loop {
+                    let metadata = fs::metadata(&target_path)?;
+                    let new_modified_time = metadata.modified()?;
 
-        let thread_checking_file_modify = thread::spawn(move || {
-            let metadata = fs::metadata(&target_path).unwrap();
-            let modified_time = metadata.modified().unwrap();
+                    if new_modified_time != modified_time {
+                        info!("quick magic detected file changed");
+                        break;
+                    }
 
-            loop {
-                let metadata = fs::metadata(&target_path).unwrap();
-                let new_modified_time = metadata.modified().unwrap();
+                    writer.write_all(b"0")?;
+                    let mut output = [0];
+                    reader.read_exact(&mut output)?;
 
-                if new_modified_time != modified_time {
-                    break;
+                    if output[0] == b'1' {
+                        info!("quick magic detected child finished");
+                        break;
+                    }
+
+                    sleep(time::Duration::from_micros(100));
                 }
 
-                thread::sleep(std::time::Duration::from_micros(500));
+                info!("main process exit");
+
+                let now = SystemTime::now();
+
+                // UNIXエポックからの経過時間を取得
+                let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+
+                // 秒とナノ秒をそれぞれ取得
+                let seconds = since_the_epoch.as_secs();
+                let nanoseconds = since_the_epoch.subsec_nanos();
+
+                // マイクロ秒単位の精度を計算
+                let microseconds = nanoseconds / 1_000;
+                println!("{}.{:06}", seconds, microseconds);
+
+                process::exit(0);
             }
-
-            info!("file modified");
-
-            tx1.send(1).unwrap();
-        });
-
-        let _ = rx.recv()?;
-
-        thread_waiting_proc.join().unwrap();
-        thread_checking_file_modify.join().unwrap();
-
-        info!("main process exit");
-
-        process::exit(0);
+            ForkResult::Child => {
+                maybe_write = Some(writer);
+            }
+        }
     }
 
     let (config, cache_dir) =
@@ -121,14 +113,9 @@ pub fn format_execute_with_args(
         !global_options.no_cache,
     )?;
 
-    if inner_quick_magic {
-        match writeln!(&mut stdout(), "y") {
-            Ok(_) => {}
-            Err(err) if err.kind() == io::ErrorKind::BrokenPipe => process::exit(141),
-            Err(err) => {
-                return Err(err.into());
-            }
-        }
+    if let Some(mut w) = maybe_write {
+        // err is maybe not important (broken pipe)
+        let _err = w.write_all(b"1");
     } else {
         println!("{:?}", res);
     }
