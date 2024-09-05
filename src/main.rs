@@ -30,7 +30,7 @@ fn main() -> Result<()> {
 
     // マイクロ秒単位の精度を計算
     let microseconds = nanoseconds / 1_000;
-    println!("{}.{:06}", seconds, microseconds);
+    // println!("{}.{:06}", seconds, microseconds);
 
     let r = execute();
 
@@ -45,7 +45,7 @@ fn main() -> Result<()> {
 
     // マイクロ秒単位の精度を計算
     let microseconds = nanoseconds / 1_000;
-    println!("{}.{:06}", seconds, microseconds);
+    // println!("{}.{:06}", seconds, microseconds);
 
     r
 }
