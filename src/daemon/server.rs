@@ -8,56 +8,183 @@ use crate::daemon::interface::{
 use crate::handle_plugin::run::run;
 use anyhow::{anyhow, Context, Result};
 use log::{debug, error, info};
+use nix::libc::{statx, AT_STATX_SYNC_AS_STAT, STATX_ALL};
 use nix::unistd::{fork, ForkResult};
 use os_pipe::PipeWriter;
 use serde_json::json;
 use std::env::current_dir;
+use std::ffi::CString;
 use std::io::{ErrorKind, Read};
 use std::net::Shutdown;
+use std::os::fd::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
+use std::sync::mpsc;
 use std::thread::sleep;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{fs, io, process, thread, time};
+use std::{fs, io, mem, process, thread, time};
+use wasmtime::component::__internal::wasmtime_environ::wasmparser::Payload;
+
+#[repr(C)]
+#[derive(Debug)]
+struct StatxTimestamp {
+    tv_sec: i64,
+    tv_nsec: u32,
+    __reserved: i32,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct Statx {
+    stx_mask: u32,
+    stx_blksize: u32,
+    stx_attributes: u64,
+    stx_nlink: u32,
+    stx_uid: u32,
+    stx_gid: u32,
+    stx_mode: u16,
+    __reserved0: [u16; 1],
+    stx_ino: u64,
+    stx_size: u64,
+    stx_blocks: u64,
+    stx_attributes_mask: u64,
+    stx_atime: StatxTimestamp,
+    stx_btime: StatxTimestamp,
+    stx_ctime: StatxTimestamp,
+    stx_mtime: StatxTimestamp,
+    stx_rdev_major: u32,
+    stx_rdev_minor: u32,
+    stx_dev_major: u32,
+    stx_dev_minor: u32,
+    __reserved2: [u64; 14],
+}
+
+const AT_FDCWD: i32 = -100;
+const STATX_BASIC_STATS: u32 = 0x000007ff;
+
+fn get_file_statx(path: &str) -> Result<nix::libc::statx> {
+    let c_path = CString::new(path)
+        .map_err(|e| e.to_string())
+        .map_err(|e| anyhow!(e))?;
+    let mut statxbuf: nix::libc::statx = unsafe { mem::zeroed() };
+
+    let ret = unsafe {
+        nix::libc::statx(
+            AT_FDCWD,
+            c_path.as_ptr(),
+            AT_STATX_SYNC_AS_STAT,
+            STATX_BASIC_STATS,
+            &mut statxbuf,
+        )
+    };
+
+    if ret != 0 {
+        Err(anyhow!("statx failed with error code: {}", ret))
+    } else {
+        Ok(statxbuf)
+    }
+}
 
 pub fn daemon_format_execute_with_args(
     args: DaemonFormatArgs,
+    current_dir: PathBuf,
     global_options: GlobalOptions,
 ) -> Result<()> {
-    let (config, cache_dir) =
-        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+    let no_quick_magic =
+        std::env::var_os("ONEFMT_NO_QUICK_MAGIC").is_some_and(|s| s != "0" && s != "");
 
-    let file = fs::File::open(&args.path)?;
-    let mut buf_reader = io::BufReader::new(file);
-    let mut contents = String::new();
-    buf_reader.read_to_string(&mut contents)?;
+    debug!("no_quick_magic: {}", no_quick_magic);
 
-    let res = run(
-        &config.rules.first().unwrap().cmd,
-        json!({
-            "current-dir": current_dir()?.canonicalize()?.to_str().unwrap(),
-            "target": args.path.canonicalize()?.to_str().unwrap(),
-            "raw-target": args.path,
-            "target-content": contents,
-            }
-        ),
-        &cache_dir,
-        !global_options.no_cache,
-    )?;
+    let target_path = current_dir.join(&args.path).canonicalize()?;
+    let target_path_outer = target_path.clone();
 
-    println!("{:?}", res);
+    let (tx, rx) = mpsc::channel();
+
+    let t = thread::spawn(move || -> Result<()> {
+        let (config, cache_dir) =
+            load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+
+        let file = fs::File::open(&target_path)?;
+        let mut buf_reader = io::BufReader::new(file);
+        let mut contents = String::new();
+        buf_reader.read_to_string(&mut contents)?;
+
+        let res = run(
+            &config.rules.first().unwrap().cmd,
+            json!({
+                "current-dir": current_dir.canonicalize()?.to_str().unwrap(),
+                "target": target_path.to_str().unwrap(),
+                "raw-target": args.path,
+                "target-content": contents,
+                }
+            ),
+            &cache_dir,
+            !global_options.no_cache,
+        )?;
+
+        println!("{:?}", res);
+
+        tx.send(0)?;
+
+        Ok(())
+    });
+
+    let modified_time = get_file_statx(&target_path_outer.to_str().unwrap())?
+        .stx_mtime
+        .tv_nsec as u64;
+
+    loop {
+        let new_modified_time = get_file_statx(&target_path_outer.to_str().unwrap())?
+            .stx_mtime
+            .tv_nsec as u64;
+
+        debug!("hmm, {:?} {:?}", &new_modified_time, &modified_time);
+
+        if new_modified_time != modified_time {
+            info!("quick magic detected file changed");
+            break;
+        }
+
+        if rx.try_recv().is_ok() {
+            info!("quick magic detected child finished");
+            break;
+        }
+
+        sleep(time::Duration::from_micros(100));
+    }
+
+    info!("main process exit");
+
+    if t.is_finished() {
+        let res = t.join().unwrap();
+        res?;
+    }
+
+    let now = SystemTime::now();
+
+    // UNIXエポックからの経過時間を取得
+    let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+
+    // 秒とナノ秒をそれぞれ取得
+    let seconds = since_the_epoch.as_secs();
+    let nanoseconds = since_the_epoch.subsec_nanos();
+
+    // マイクロ秒単位の精度を計算
+    let microseconds = nanoseconds / 1_000;
+    println!("{}.{:06}", seconds, microseconds);
 
     Ok(())
 }
 
-fn serverside_exec_command(
-    cmd: DaemonCommands,
-    global_options: GlobalOptions,
-) -> Result<DaemonResponse> {
-    match cmd {
+fn serverside_exec_command(payload: DaemonCommandPayload) -> Result<DaemonResponse> {
+    match payload.command {
         DaemonCommands::Format(s_args) => {
-            match daemon_format_execute_with_args(s_args, global_options) {
+            match daemon_format_execute_with_args(
+                s_args,
+                payload.current_dir,
+                payload.global_options,
+            ) {
                 Ok(_) => Ok(DaemonResponse::Format(DaemonFormatResponse::Success)),
                 Err(err) => Ok(DaemonResponse::Format(DaemonFormatResponse::Error(
                     err.to_string(),
@@ -75,7 +202,7 @@ fn handle_client(mut stream: UnixStream) -> Result<()> {
 
     info!("Received: {:?}", &payload);
 
-    let response = serverside_exec_command(payload.command, payload.global_options)?;
+    let response = serverside_exec_command(payload)?;
 
     info!("Response: {:?}", &response);
 
@@ -142,6 +269,8 @@ pub fn daemon_main(socket: WrappedUnixSocket) -> Result<()> {
 }
 
 pub fn start_daemon(socket: &PathBuf, attach: bool) -> Result<()> {
+    info!("Starting daemon (attach: {})", attach);
+
     let listener = WrappedUnixSocket::bind(socket)?;
 
     if attach {

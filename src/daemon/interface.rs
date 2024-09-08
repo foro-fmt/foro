@@ -19,6 +19,7 @@ pub enum DaemonCommands {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DaemonCommandPayload {
     pub command: DaemonCommands,
+    pub current_dir: PathBuf,
     pub global_options: GlobalOptions,
 }
 

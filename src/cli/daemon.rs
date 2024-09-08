@@ -13,6 +13,7 @@ use log::{debug, error, info};
 use nix::unistd::{fork, ForkResult};
 use os_pipe::PipeWriter;
 use serde_json::json;
+use std::io::prelude::*;
 use std::io::ErrorKind;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
