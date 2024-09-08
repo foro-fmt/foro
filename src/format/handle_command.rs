@@ -33,12 +33,4 @@ pub fn handle_wasm_url(url: Url) -> Result<()> {
     Ok(())
 }
 
-pub fn handle_command(command: Command) {
-    match command {
-        Command::PluginUrl(url) => {
-            handle_wasm_url(url.into_inner());
-        }
-        Command::SimpleCommand(cmd) => {}
-        Command::Finding { .. } => {}
-    }
-}
+pub fn handle_command(command: Command) {}

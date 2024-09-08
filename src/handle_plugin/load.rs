@@ -1,5 +1,5 @@
 use crate::app_dir::cache_dir_res;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{debug, info};
 use serde_json::{json, Value};
 use std::io::Read;
@@ -60,7 +60,7 @@ pub(crate) fn _load_module_base_with_cache(
 
         Ok(module)
     } else {
-        debug!(
+        info!(
             "cache does not exist, download/create module: {}",
             cache_path.display()
         );
@@ -85,7 +85,7 @@ pub(crate) fn _load_module_base(
     if use_cache {
         _load_module_base_with_cache(engine, lazy_module_bin, cache_path)
     } else {
-        debug!("loading module (no cache!)");
+        info!("loading module (no cache!)");
 
         let bin_module = lazy_module_bin()?;
         let module = Module::from_binary(&engine, bin_module.as_slice())?;
@@ -117,7 +117,7 @@ pub(crate) fn load_local_module(
 
 pub(crate) fn load_url_module(
     engine: &Engine,
-    url: Url,
+    url: &Url,
     cache_path: &PathBuf,
     use_cache: bool,
 ) -> Result<Module> {
@@ -133,7 +133,7 @@ pub(crate) fn load_url_module(
         let response = reqwest::blocking::get(url.to_string())?;
 
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("Failed to download: {}", response.status()));
+            return Err(anyhow!("Failed to download: {}", response.status()));
         }
 
         Ok(response.bytes()?.to_vec())

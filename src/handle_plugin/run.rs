@@ -1,21 +1,31 @@
 use crate::app_dir::cache_dir_res;
 use crate::config::Command;
 use crate::handle_plugin::load::{_load_module_base, load_local_module, load_url_module};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{debug, info, trace};
 use minijinja;
 use onefmt_plugin_utils::data_json_utils::{merge, JsonGetter};
 use serde_json::{json, Value};
 use shell_words;
-use std::fs;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::{Arc, LazyLock, Mutex, MutexGuard};
+use std::thread::sleep;
 use std::time::Instant;
+use std::{fs, time};
 use url::Url;
-use wasmtime::{Config, Engine, Instance, Linker, Module, Store, Val};
+use wasmtime::{
+    AsContextMut, Config, Engine, Instance, Linker, Module, Store, StoreContext, StoreContextMut,
+    Val,
+};
 use wasmtime_wasi::preview1::WasiP1Ctx;
 use wasmtime_wasi::{preview1, DirPerms, FilePerms, WasiCtxBuilder};
 
+#[derive(Hash, Eq, PartialEq)]
 pub(crate) enum WasmSource {
     LocalPath(PathBuf),
     Url(Url),
@@ -26,8 +36,11 @@ pub(crate) struct PluginSetting {
     pub(crate) cache: bool,
 }
 
+static CACHE_INIT: LazyLock<Mutex<HashMap<WasmSource, (Instance, Mutex<Store<WasiP1Ctx>>)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
 fn init_instance(
-    setting: PluginSetting,
+    setting: &PluginSetting,
     cache_path: &PathBuf,
     use_cache: bool,
 ) -> Result<(Instance, Store<WasiP1Ctx>)> {
@@ -40,13 +53,9 @@ fn init_instance(
 
     trace!("loaded engine");
 
-    let module = match setting.wasm_source {
-        WasmSource::LocalPath(path) => {
-            load_local_module(&engine, path, cache_path, use_cache && setting.cache)?
-        }
-        WasmSource::Url(url) => {
-            load_url_module(&engine, url, cache_path, use_cache && setting.cache)?
-        }
+    let module = match &setting.wasm_source {
+        WasmSource::LocalPath(path) => load_local_module(&engine, path, cache_path, use_cache)?,
+        WasmSource::Url(url) => load_url_module(&engine, url, cache_path, use_cache)?,
     };
 
     trace!("loaded module");
@@ -74,16 +83,11 @@ fn init_instance(
     Ok((instance, store))
 }
 
-pub(crate) fn run_plugin(
-    setting: PluginSetting,
+pub(crate) fn run_plugin_inner(
+    instance: Instance,
+    mut store: &mut Store<WasiP1Ctx>,
     cur_map: Value,
-    cache_path: &PathBuf,
-    use_cache: bool,
 ) -> Result<Value> {
-    let (instance, mut store) = init_instance(setting, cache_path, use_cache)?;
-
-    trace!("loaded instance");
-
     let memory = instance
         .get_memory(&mut store, "memory")
         .context("Failed to get memory")?;
@@ -127,7 +131,7 @@ pub(crate) fn run_plugin(
     trace!("free memory");
 
     if let Some(err_s) = String::get_value_opt(&output_value, ["plugin-panic"]) {
-        return Err(anyhow::anyhow!("Plugin panicked: {}", err_s));
+        return Err(anyhow!("Plugin panicked: {}", err_s));
     }
 
     if let Some(formatted) = String::get_value_opt(&output_value, ["formatted-content"]) {
@@ -140,6 +144,37 @@ pub(crate) fn run_plugin(
     // drop of store is so slow, another thread dropping is maybe faster
 
     Ok(output_value)
+}
+
+pub(crate) fn run_plugin(
+    setting: PluginSetting,
+    cur_map: Value,
+    cache_path: &PathBuf,
+    use_cache: bool,
+) -> Result<Value> {
+    let use_cache = use_cache && setting.cache;
+
+    if use_cache {
+        if let Some((instance, store)) = CACHE_INIT.lock().unwrap().get(&setting.wasm_source) {
+            debug!("loaded from in-memory cache");
+            return run_plugin_inner(instance.clone(), store.lock().unwrap().deref_mut(), cur_map);
+        }
+    }
+
+    let (instance, mut store) = init_instance(&setting, cache_path, use_cache)?;
+
+    if use_cache {
+        let res = run_plugin_inner(instance.clone(), &mut store, cur_map);
+
+        CACHE_INIT
+            .lock()
+            .unwrap()
+            .insert(setting.wasm_source, (instance.clone(), Mutex::new(store)));
+
+        return res;
+    }
+
+    run_plugin_inner(instance.clone(), &mut store, cur_map)
 }
 
 pub fn run(
@@ -200,6 +235,15 @@ pub fn run(
 
                 Ok(res)
             }
+        }
+        Command::Sequential(commands) => {
+            for command in commands {
+                let res = run(command, cur_json.clone(), cache_path, use_cache)?;
+
+                merge(&mut cur_json, &res);
+            }
+
+            Ok(cur_json)
         }
     };
 

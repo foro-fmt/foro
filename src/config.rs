@@ -1,4 +1,4 @@
-use crate::app_dir::{cache_dir, cache_dir_res, config_file};
+use crate::app_dir::{cache_dir, cache_dir_res, config_file, socket_dir_res};
 use crate::cli::GlobalOptions;
 use anyhow::{anyhow, Context, Result};
 use clap::builder::Str;
@@ -38,6 +38,7 @@ pub enum Command {
         #[serde(rename = "else")]
         else_: Box<Command>,
     },
+    Sequential(Vec<Command>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -50,7 +51,9 @@ pub struct Rule {
 pub struct Config {
     pub rules: Vec<Rule>,
     #[serde(default = "none")]
-    pub cache_path: Option<PathBuf>,
+    pub cache_dir: Option<PathBuf>,
+    #[serde(default = "none")]
+    pub socket_dir: Option<PathBuf>,
 }
 
 fn true_() -> bool {
@@ -105,7 +108,7 @@ pub(crate) fn get_or_create_default_config() -> Option<PathBuf> {
     Some(config_path)
 }
 
-pub(crate) fn load_config_for_cli(
+pub(crate) fn load_config_and_cache(
     given_config_file: &Option<PathBuf>,
     given_cache_dir: &Option<PathBuf>,
 ) -> Result<(Config, PathBuf)> {
@@ -119,7 +122,7 @@ pub(crate) fn load_config_for_cli(
 
     let cache_dir = given_cache_dir
         .clone()
-        .or(config.cache_path.clone())
+        .or(config.cache_dir.clone())
         .unwrap_or(cache_dir_res()?);
 
     debug!("config file: {:?}", &config_file);
@@ -127,4 +130,28 @@ pub(crate) fn load_config_for_cli(
     debug!("cache dir: {:?}", &cache_dir);
 
     Ok((config, cache_dir))
+}
+
+pub(crate) fn load_config_and_socket(
+    given_config_file: &Option<PathBuf>,
+    given_socket_dir: &Option<PathBuf>,
+) -> Result<(Config, PathBuf)> {
+    let config_file = given_config_file
+        .clone()
+        .or_else(get_or_create_default_config)
+        .context("Could not get config directory")?;
+
+    let config = load_file(&config_file)
+        .context(format!("Failed to load config file ({:?})", &config_file).to_string())?;
+
+    let socket_dir = given_socket_dir
+        .clone()
+        .or(config.socket_dir.clone())
+        .unwrap_or(socket_dir_res()?);
+
+    debug!("config file: {:?}", &config_file);
+    debug!("config: {:?}", &config);
+    debug!("socket dir: {:?}", &socket_dir);
+
+    Ok((config, socket_dir))
 }

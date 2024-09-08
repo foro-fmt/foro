@@ -6,6 +6,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 mod app_dir;
 mod cli;
 mod config;
+mod daemon;
 mod format;
 mod handle_plugin;
 

@@ -1,7 +1,7 @@
 use crate::app_dir::cache_dir_res;
 use crate::cli::GlobalOptions;
 use crate::config;
-use crate::config::{get_or_create_default_config, load_config_for_cli, load_file, Command};
+use crate::config::{get_or_create_default_config, load_config_and_cache, load_file, Command};
 use crate::handle_plugin::run::run;
 use anyhow::{Context, Error, Result};
 use clap::builder::{IntoResettable, Resettable, ValueHint};
@@ -93,7 +93,7 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
     }
 
     let (config, cache_dir) =
-        load_config_for_cli(&global_options.config_file, &global_options.cache_dir)?;
+        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
     let file = fs::File::open(&args.path)?;
     let mut buf_reader = io::BufReader::new(file);

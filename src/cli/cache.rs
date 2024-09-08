@@ -1,7 +1,7 @@
 use crate::cli::format::FormatArgs;
 use crate::cli::{format, GlobalOptions};
 use crate::config;
-use crate::config::{get_or_create_default_config, load_config_for_cli, load_file};
+use crate::config::{get_or_create_default_config, load_config_and_cache, load_file};
 use crate::handle_plugin::run::run;
 use anyhow::Context;
 use anyhow::Result;
@@ -24,7 +24,7 @@ pub fn cache_clean_execute_with_args(
     global_options: GlobalOptions,
 ) -> Result<()> {
     let (_, cache_dir) =
-        load_config_for_cli(&global_options.config_file, &global_options.cache_dir)?;
+        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
     if (!(cache_dir.file_name() == Some("onefmt".as_ref()))) && (!args.yes) {
         debug!("cache directory seems not to be onefmt cache directory, so we ask the user");
@@ -61,9 +61,9 @@ pub struct CacheDirArgs {}
 pub fn cache_dir_execute_with_args(
     _args: CacheDirArgs,
     global_options: GlobalOptions,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     let (_, cache_dir) =
-        load_config_for_cli(&global_options.config_file, &global_options.cache_dir)?;
+        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
     println!("Cache Directory: {:?}", cache_dir.canonicalize()?);
 
@@ -83,7 +83,7 @@ pub struct CacheArgs {
 
 pub fn cache_execute_with_args(args: CacheArgs, global_options: GlobalOptions) -> Result<()> {
     match args.subcommand {
-        CacheSubCommands::Clean(args) => cache_clean_execute_with_args(args, global_options),
-        CacheSubCommands::Dir(args) => cache_dir_execute_with_args(args, global_options),
+        CacheSubCommands::Clean(s_args) => cache_clean_execute_with_args(s_args, global_options),
+        CacheSubCommands::Dir(s_args) => cache_dir_execute_with_args(s_args, global_options),
     }
 }
