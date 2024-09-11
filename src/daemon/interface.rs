@@ -26,6 +26,7 @@ pub struct DaemonCommandPayload {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonFormatResponse {
     Success,
+    Ignored,
     Error(String),
 }
 

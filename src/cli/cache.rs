@@ -26,8 +26,8 @@ pub fn cache_clean_execute_with_args(
     let (_, cache_dir) =
         load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
-    if (!(cache_dir.file_name() == Some("onefmt".as_ref()))) && (!args.yes) {
-        debug!("cache directory seems not to be onefmt cache directory, so we ask the user");
+    if (!(cache_dir.file_name() == Some("foro".as_ref()))) && (!args.yes) {
+        debug!("cache directory seems not to be foro cache directory, so we ask the user");
 
         let confirm = Confirm::new()
             .with_prompt(format!(

@@ -1,5 +1,5 @@
 use crate::cli::format::FormatArgs;
-use crate::cli::{GlobalOptions, IS_DAEMON_PROCESS};
+use crate::cli::{GlobalOptions, DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD, IS_DAEMON_PROCESS};
 use crate::config::{load_config_and_cache, load_config_and_socket};
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
@@ -8,8 +8,9 @@ use crate::daemon::interface::{
 use crate::handle_plugin::run::run;
 use anyhow::{anyhow, Context, Result};
 use log::{debug, error, info};
-use nix::libc::{statx, AT_STATX_SYNC_AS_STAT, STATX_ALL};
+use nix::libc::statx;
 use nix::unistd::{fork, ForkResult};
+use notify::Watcher;
 use os_pipe::PipeWriter;
 use serde_json::json;
 use std::env::current_dir;
@@ -22,77 +23,17 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread::sleep;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs, io, mem, process, thread, time};
 use wasmtime::component::__internal::wasmtime_environ::wasmparser::Payload;
-
-#[repr(C)]
-#[derive(Debug)]
-struct StatxTimestamp {
-    tv_sec: i64,
-    tv_nsec: u32,
-    __reserved: i32,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-struct Statx {
-    stx_mask: u32,
-    stx_blksize: u32,
-    stx_attributes: u64,
-    stx_nlink: u32,
-    stx_uid: u32,
-    stx_gid: u32,
-    stx_mode: u16,
-    __reserved0: [u16; 1],
-    stx_ino: u64,
-    stx_size: u64,
-    stx_blocks: u64,
-    stx_attributes_mask: u64,
-    stx_atime: StatxTimestamp,
-    stx_btime: StatxTimestamp,
-    stx_ctime: StatxTimestamp,
-    stx_mtime: StatxTimestamp,
-    stx_rdev_major: u32,
-    stx_rdev_minor: u32,
-    stx_dev_major: u32,
-    stx_dev_minor: u32,
-    __reserved2: [u64; 14],
-}
-
-const AT_FDCWD: i32 = -100;
-const STATX_BASIC_STATS: u32 = 0x000007ff;
-
-fn get_file_statx(path: &str) -> Result<nix::libc::statx> {
-    let c_path = CString::new(path)
-        .map_err(|e| e.to_string())
-        .map_err(|e| anyhow!(e))?;
-    let mut statxbuf: nix::libc::statx = unsafe { mem::zeroed() };
-
-    let ret = unsafe {
-        nix::libc::statx(
-            AT_FDCWD,
-            c_path.as_ptr(),
-            AT_STATX_SYNC_AS_STAT,
-            STATX_BASIC_STATS,
-            &mut statxbuf,
-        )
-    };
-
-    if ret != 0 {
-        Err(anyhow!("statx failed with error code: {}", ret))
-    } else {
-        Ok(statxbuf)
-    }
-}
 
 pub fn daemon_format_execute_with_args(
     args: DaemonFormatArgs,
     current_dir: PathBuf,
     global_options: GlobalOptions,
-) -> Result<()> {
+) -> Result<DaemonFormatResponse> {
     let no_quick_magic =
-        std::env::var_os("ONEFMT_NO_QUICK_MAGIC").is_some_and(|s| s != "0" && s != "");
+        std::env::var_os("FORO_NO_QUICK_MAGIC").is_some_and(|s| s != "0" && s != "");
 
     debug!("no_quick_magic: {}", no_quick_magic);
 
@@ -101,7 +42,14 @@ pub fn daemon_format_execute_with_args(
 
     let (tx, rx) = mpsc::channel();
 
-    let t = thread::spawn(move || -> Result<()> {
+    let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(|| Instant::now()));
+
+    // todo: maybe to implement `?` operator to DaemonFormatResponse is better
+    let t = thread::spawn(move || -> Result<Option<DaemonFormatResponse>> {
+        DAEMON_THREAD_START.with(|start| {
+            let _ = start.set(parent_start_time);
+        });
+
         let (config, cache_dir) =
             load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
@@ -110,8 +58,17 @@ pub fn daemon_format_execute_with_args(
         let mut contents = String::new();
         buf_reader.read_to_string(&mut contents)?;
 
+        let rule = match config.find_matched_rule(&target_path) {
+            Some(rule) => rule,
+            None => {
+                return Ok(Some(DaemonFormatResponse::Ignored));
+            }
+        };
+
+        info!("run rule: {:?}", rule);
+
         let res = run(
-            &config.rules.first().unwrap().cmd,
+            &rule.cmd,
             json!({
                 "current-dir": current_dir.canonicalize()?.to_str().unwrap(),
                 "target": target_path.to_str().unwrap(),
@@ -127,21 +84,20 @@ pub fn daemon_format_execute_with_args(
 
         tx.send(0)?;
 
-        Ok(())
+        Ok(None)
     });
 
-    let modified_time = get_file_statx(&target_path_outer.to_str().unwrap())?
-        .stx_mtime
-        .tv_nsec as u64;
+    let (w_tx, w_rx) = mpsc::channel();
+
+    let mut watcher = notify::RecommendedWatcher::new(
+        w_tx,
+        notify::Config::default().with_poll_interval(Duration::from_micros(100)),
+    )?;
+
+    watcher.watch(&target_path_outer, notify::RecursiveMode::NonRecursive)?;
 
     loop {
-        let new_modified_time = get_file_statx(&target_path_outer.to_str().unwrap())?
-            .stx_mtime
-            .tv_nsec as u64;
-
-        debug!("hmm, {:?} {:?}", &new_modified_time, &modified_time);
-
-        if new_modified_time != modified_time {
+        if w_rx.try_recv().is_ok() {
             info!("quick magic detected file changed");
             break;
         }
@@ -151,15 +107,27 @@ pub fn daemon_format_execute_with_args(
             break;
         }
 
-        sleep(time::Duration::from_micros(100));
-    }
+        if t.is_finished() {
+            break;
+        }
 
-    info!("main process exit");
+        sleep(Duration::from_micros(10));
+    }
 
     if t.is_finished() {
         let res = t.join().unwrap();
-        res?;
+        match res {
+            Ok(Some(res)) => {
+                return Ok(res);
+            }
+            Err(err) => {
+                return Err(err);
+            }
+            _ => {}
+        }
     }
+
+    info!("main process exit");
 
     let now = SystemTime::now();
 
@@ -174,10 +142,10 @@ pub fn daemon_format_execute_with_args(
     let microseconds = nanoseconds / 1_000;
     println!("{}.{:06}", seconds, microseconds);
 
-    Ok(())
+    Ok(DaemonFormatResponse::Success)
 }
 
-fn serverside_exec_command(payload: DaemonCommandPayload) -> Result<DaemonResponse> {
+fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse {
     match payload.command {
         DaemonCommands::Format(s_args) => {
             match daemon_format_execute_with_args(
@@ -185,13 +153,11 @@ fn serverside_exec_command(payload: DaemonCommandPayload) -> Result<DaemonRespon
                 payload.current_dir,
                 payload.global_options,
             ) {
-                Ok(_) => Ok(DaemonResponse::Format(DaemonFormatResponse::Success)),
-                Err(err) => Ok(DaemonResponse::Format(DaemonFormatResponse::Error(
-                    err.to_string(),
-                ))),
+                Ok(res) => DaemonResponse::Format(res),
+                Err(err) => DaemonResponse::Format(DaemonFormatResponse::Error(err.to_string())),
             }
         }
-        DaemonCommands::Ping => Ok(DaemonResponse::Pong),
+        DaemonCommands::Ping => DaemonResponse::Pong,
     }
 }
 
@@ -202,7 +168,7 @@ fn handle_client(mut stream: UnixStream) -> Result<()> {
 
     info!("Received: {:?}", &payload);
 
-    let response = serverside_exec_command(payload)?;
+    let response = serverside_exec_command(payload);
 
     info!("Response: {:?}", &response);
 
@@ -257,7 +223,10 @@ pub fn daemon_main(socket: WrappedUnixSocket) -> Result<()> {
     for stream in socket.listener.incoming() {
         match stream {
             Ok(stream) => {
-                thread::spawn(|| handle_client(stream));
+                thread::spawn(|| {
+                    info!("New client connected");
+                    handle_client(stream).unwrap();
+                });
             }
             Err(err) => {
                 error!("Error: {}", err);
@@ -275,6 +244,12 @@ pub fn start_daemon(socket: &PathBuf, attach: bool) -> Result<()> {
 
     if attach {
         IS_DAEMON_PROCESS.store(true, Ordering::SeqCst);
+        IS_DAEMON_MAIN_THREAD.with(|is_main_thread| {
+            let _ = is_main_thread.set(true);
+        });
+
+        info!("Daemon started");
+
         daemon_main(listener)?;
     } else {
     }

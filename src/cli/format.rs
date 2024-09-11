@@ -30,7 +30,7 @@ pub struct FormatArgs {
 
 pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions) -> Result<()> {
     let no_quick_magic =
-        std::env::var_os("ONEFMT_NO_QUICK_MAGIC").is_some_and(|s| s != "0" && s != "");
+        std::env::var_os("FORO_NO_QUICK_MAGIC").is_some_and(|s| s != "0" && s != "");
 
     debug!("no_quick_magic: {}", no_quick_magic);
 
@@ -43,6 +43,7 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
 
         info!("open pipe");
 
+        // platform-dependent: fork with nix is only available on unix
         match unsafe { fork()? } {
             ForkResult::Parent { child } => {
                 let metadata = fs::metadata(&target_path)?;
@@ -95,16 +96,24 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
     let (config, cache_dir) =
         load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
+    let target_path = args.path.canonicalize()?;
+
     let file = fs::File::open(&args.path)?;
     let mut buf_reader = io::BufReader::new(file);
     let mut contents = String::new();
     buf_reader.read_to_string(&mut contents)?;
 
+    let rule = config
+        .find_matched_rule(&target_path)
+        .context("No rule matched")?;
+
+    info!("run rule: {:?}", rule);
+
     let res = run(
-        &config.rules.first().unwrap().cmd,
+        &rule.cmd,
         json!({
             "current-dir": current_dir()?.canonicalize()?.to_str().unwrap(),
-            "target": args.path.canonicalize()?.to_str().unwrap(),
+            "target": target_path,
             "raw-target": args.path,
             "target-content": contents,
             }

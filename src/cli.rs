@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use env_logger::fmt::Timestamp;
 use env_logger::TimestampPrecision;
+use std::cell::{OnceCell, RefCell};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -29,7 +30,7 @@ pub enum SubCommands {
 
 #[derive(Parser, Serialize, Deserialize, Debug)]
 pub struct GlobalOptions {
-    /// The path to an onefmt.json file to use for configuration
+    /// The path to an foro.json file to use for configuration
     #[arg(long, value_name = "PATH")]
     pub config_file: Option<PathBuf>,
 
@@ -55,15 +56,24 @@ pub struct Command {
 }
 
 pub static IS_DAEMON_PROCESS: AtomicBool = AtomicBool::new(false);
+thread_local!(pub static DAEMON_THREAD_START: OnceCell<Instant> = OnceCell::new());
+thread_local!(pub static IS_DAEMON_MAIN_THREAD: OnceCell<bool> = OnceCell::new());
 
 pub fn execute_with_args(args: Command) -> Result<()> {
     let start_time = Instant::now();
 
     env_logger::Builder::new()
-        .filter_module("onefmt", args.verbose.log_level_filter())
+        .filter_module("foro", args.verbose.log_level_filter())
         .format(move |buf, record| {
             if IS_DAEMON_PROCESS.load(Ordering::SeqCst) {
                 let now = buf.timestamp_micros();
+
+                let elapsed =
+                    DAEMON_THREAD_START.with(|start| start.get_or_init(Instant::now).elapsed());
+                let elapsed_micros = elapsed.as_micros();
+
+                let is_main_thread = IS_DAEMON_MAIN_THREAD
+                    .with(|is_main_thread| *is_main_thread.get_or_init(|| false));
 
                 let level = record.level();
                 let level_style = buf.default_level_style(level);
@@ -71,6 +81,9 @@ pub fn execute_with_args(args: Command) -> Result<()> {
                 let path = record.module_path().unwrap_or("");
 
                 write!(buf, "[{now} ")?;
+                if !is_main_thread {
+                    write!(buf, "{elapsed_micros:>5} μs ")?;
+                }
                 write!(buf, "{level_style}{level:<5}{level_style:#} ")?;
                 write!(buf, "{path}] ")?;
                 write!(buf, "{body}\n", body = record.args())?;
@@ -93,7 +106,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
         })
         .init();
 
-    debug!("start onefmt: {:?}", &args);
+    debug!("start foro: {:?}", &args);
 
     let global_options = args.global_options;
 
@@ -103,7 +116,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
         SubCommands::Format(s_args) => format_execute_with_args(s_args, global_options),
     }?;
 
-    debug!("end onefmt");
+    debug!("end foro");
 
     Ok(())
 }

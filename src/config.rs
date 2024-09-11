@@ -6,6 +6,7 @@ use log::{debug, info};
 use serde::de::{Error, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::io::Read;
 use std::path::PathBuf;
@@ -13,11 +14,22 @@ use std::{fs, io};
 use url::Url;
 use url_serde;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum OnRule {
     Extension(String),
     Or(Vec<OnRule>),
+}
+
+impl OnRule {
+    pub fn on_match(&self, target_path: &PathBuf) -> bool {
+        match self {
+            OnRule::Extension(ext) => target_path
+                .extension()
+                .map_or(false, |e| &format!(".{}", e.to_string_lossy()) == ext),
+            OnRule::Or(rules) => rules.iter().any(|rule| rule.on_match(target_path)),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -27,11 +39,14 @@ pub enum SomePath {
     Or(Vec<PathBuf>),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Command {
     PluginUrl(url_serde::SerdeUrl),
     SimpleCommand(String),
+    CommandIO {
+        io: String,
+    },
     Finding {
         finding: Box<Command>,
         if_found: Box<Command>,
@@ -39,12 +54,22 @@ pub enum Command {
         else_: Box<Command>,
     },
     Sequential(Vec<Command>),
+    NativeDll {
+        #[serde(rename = "__deprecation_native_dll")]
+        native_dll: String,
+    },
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Rule {
     pub on: OnRule,
     pub cmd: Command,
+}
+
+impl Rule {
+    pub fn on_match(&self, target_path: &PathBuf) -> bool {
+        self.on.on_match(target_path)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -62,6 +87,18 @@ fn true_() -> bool {
 
 fn none<T>() -> Option<T> {
     None
+}
+
+impl Config {
+    pub fn find_matched_rule(&self, target_path: &PathBuf) -> Option<Rule> {
+        for rule in &self.rules {
+            if rule.on_match(target_path) {
+                return Some(rule.clone());
+            }
+        }
+
+        None
+    }
 }
 
 pub fn load_str(json: &str) -> Result<Config> {
@@ -91,9 +128,9 @@ pub(crate) fn get_or_create_default_config() -> Option<PathBuf> {
         {
             "on": [".ts", "tsx"],
             "cmd": {
-                "finding": "https://github.com/nahco314/onefmt-find-biome/releases/download/v0.0.1/onefmt_find_biome.wasm",
+                "finding": "https://github.com/nahco314/foro-find-biome/releases/download/v0.0.1/foro_find_biome.wasm",
                 "if_found": "{{ biome }} format --write {{ target }}",
-                "else": "http://0.0.0.0:8000/target/wasm32-wasi/super-release/onefmt_biome_fallback.wasm"
+                "else": "http://0.0.0.0:8000/target/wasm32-wasi/super-release/foro_biome_fallback.wasm"
             }
         }
     ]

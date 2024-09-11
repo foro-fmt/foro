@@ -98,6 +98,9 @@ pub fn run_command(
         DaemonResponse::Format(DaemonFormatResponse::Success) => {
             println!("Success to format");
         }
+        DaemonResponse::Format(DaemonFormatResponse::Ignored) => {
+            println!("File ignored");
+        }
         DaemonResponse::Format(DaemonFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
         }

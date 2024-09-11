@@ -1,3 +1,8 @@
+// platform-dependent: foro communicates with a daemon via unix domain socket.
+//   this is platform-dependent.
+//   the part about passing the socket path as a command argument also needs
+// to be considered as an alternative.
+
 use crate::cli::cache::CacheSubCommands;
 use crate::cli::format::FormatArgs;
 use crate::cli::GlobalOptions;
