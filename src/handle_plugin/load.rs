@@ -1,17 +1,9 @@
-use crate::app_dir::cache_dir_res;
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info};
-use serde_json::{json, Value};
-use std::io::Read;
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::Instant;
-use std::{fs, io, slice};
-use tempfile::tempfile;
 use url::Url;
 use wasmtime::*;
-use wasmtime_wasi::preview1::{self, WasiP1Ctx};
-use wasmtime_wasi::{DirPerms, FilePerms, WasiCtxBuilder};
 
 fn _display_file_size(path: PathBuf) -> String {
     match fs::metadata(path) {
@@ -42,9 +34,9 @@ fn _display_file_size(path: PathBuf) -> String {
 pub(crate) fn _load_module_base_with_cache(
     engine: &Engine,
     lazy_module_bin: impl Fn() -> Result<Vec<u8>>,
-    mut cache_path: impl AsRef<Path>,
+    cache_path: impl AsRef<Path>,
 ) -> Result<Module> {
-    let mut cache_path = cache_path.as_ref().to_path_buf();
+    let cache_path = cache_path.as_ref().to_path_buf();
 
     if cache_path.exists() {
         debug!("loading from cache: {}", cache_path.display());

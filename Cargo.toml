@@ -23,18 +23,22 @@ url_serde = "0.2.0"
 url = "1.7.2"
 urlencoding = "2.1.3"
 reqwest = { version = "0.12.7", default-features = false, features = ["rustls-tls", "http2", "blocking"] }
-tokio = { version = "1", features = ["full"] }
-wasmtime = "24.0.0"
+# only the necessary features are extracted to speed up the build process
+wasmtime = { version = "24.0.0", default-features = false, features = ["runtime", "gc", "threads", "cranelift"] }
 wasmtime-wasi = "24.0.0"
-tempfile = "3.12.0"
 minijinja = "2.2.0"
-shell-words = "1.1.0"
 dialoguer = "0.11.0"
 foro-plugin-utils = { git = "https://github.com/nahco314/foro-plugin-utils", version = "0.1.0" }
-nix = { version = "0.29.0", features = ["process", "fs"]}
 os_pipe = "1.2.1"
 notify = "6.1.1"
 libloading = "0.8.5"
-filemq = { git = "https://github.com/nahco314/filemq", version = "0.1.0" }
+sysinfo = "0.31.4"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.29.0", features = ["process", "fs", "feature"]}
+shell-words = "1.1.0"
+
+[target.'cfg(windows)'.dependencies]
 winsplit = "0.1.0"
 uds_windows = "1.1.0"
+winapi = { version = "0.3", features = ["winbase", "minwindef", "winnt", "processthreadsapi"] }

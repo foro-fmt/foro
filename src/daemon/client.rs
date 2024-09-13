@@ -1,21 +1,52 @@
 use crate::cli::GlobalOptions;
 use crate::daemon::interface::{
-    DaemonCommandPayload, DaemonCommands, DaemonFormatResponse, DaemonResponse, DaemonSocketPath,
+    DaemonCommandPayload, DaemonCommands, DaemonFormatResponse, DaemonPureFormatResponse,
+    DaemonResponse, DaemonSocketPath,
 };
-use crate::daemon::server::start_daemon;
-use anyhow::__private::kind::TraitKind;
-use anyhow::{anyhow, Result};
-use log::{debug, error, info};
+use crate::process_utils::{get_start_time, is_alive};
+use anyhow::{anyhow, Context, Result};
+use log::{debug, info};
 use std::env::current_dir;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Write};
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
+use std::time::Duration;
 #[cfg(windows)]
 use uds_windows::UnixStream;
-use std::path::{Path, PathBuf};
-use std::thread;
-use std::thread::sleep;
-use std::time::Duration;
+
+fn parse_info(info_str: &str) -> Option<(u32, u64)> {
+    let parts: Vec<&str> = info_str.split(',').collect();
+
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let pid = parts[0].parse().ok()?;
+    let start_time = parts[1].parse().ok()?;
+
+    Some((pid, start_time))
+}
+
+pub fn daemon_is_alive(socket: &DaemonSocketPath) -> Result<bool> {
+    // don't call path.exits()
+    // because we can reduce the number of system calls and speed up (a little bit!)
+    let content = match std::fs::read_to_string(&socket.info_path) {
+        Ok(content) => content,
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(false),
+        Err(err) => return Err(err.into()),
+    };
+    let (pid, start_time) = parse_info(&content).context("Failed to parse daemon info")?;
+
+    if !is_alive(pid) {
+        return Ok(false);
+    }
+
+    if get_start_time(pid)? != start_time {
+        return Ok(false);
+    }
+
+    Ok(true)
+}
 
 pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
     match UnixStream::connect(&socket.socket_path) {
@@ -25,12 +56,13 @@ pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
                 GlobalOptions {
                     config_file: None,
                     cache_dir: None,
+                    socket_dir: None,
                     no_cache: false,
                 },
                 stream,
                 Some(Duration::from_secs(1)),
             ) {
-                Ok(DaemonResponse::Pong) => Ok(true),
+                Ok(DaemonResponse::Pong(_)) => Ok(true),
                 Ok(_) => Ok(false),
                 Err(err) => {
                     let was_timed_out = err
@@ -56,17 +88,15 @@ pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
 fn run_command_inner(
     command: DaemonCommands,
     global_options: GlobalOptions,
-    stream: UnixStream,
+    mut stream: UnixStream,
     timeout: Option<Duration>,
 ) -> Result<DaemonResponse> {
-    serde_json::to_writer(
-        &stream,
-        &DaemonCommandPayload {
-            command,
-            current_dir: current_dir()?,
-            global_options,
-        },
-    )?;
+    let buf = serde_json::to_vec(&DaemonCommandPayload {
+        command,
+        current_dir: current_dir()?,
+        global_options,
+    })?;
+    stream.write_all(&buf)?;
 
     debug!("Sent command");
 
@@ -85,30 +115,53 @@ pub fn run_command(
     command: DaemonCommands,
     global_options: GlobalOptions,
     socket: &DaemonSocketPath,
-    no_auto_start: bool,
+    check_alive: bool,
 ) -> Result<()> {
-    if !ping(&socket)? {
-        if no_auto_start {
-            return Err(anyhow!("Daemon is not running"));
-        } else {
-            start_daemon(&socket, false)?;
+    if check_alive && !daemon_is_alive(&socket)? {
+        match command {
+            DaemonCommands::Stop => {
+                // in rare cases, daemon_is_alive return false, but the process may still be alive
+                if !ping(&socket)? {
+                    info!("Daemon is not running");
+                    return Ok(());
+                }
+            }
+            _ => {
+                return Err(anyhow!("Daemon is not running!"));
+            }
         }
     }
 
     let stream = UnixStream::connect(&socket.socket_path)?;
 
     match run_command_inner(command, global_options, stream, None)? {
-        DaemonResponse::Format(DaemonFormatResponse::Success) => {
+        DaemonResponse::Format(DaemonFormatResponse::Success()) => {
             println!("Success to format");
         }
-        DaemonResponse::Format(DaemonFormatResponse::Ignored) => {
+        DaemonResponse::Format(DaemonFormatResponse::Ignored()) => {
             println!("File ignored");
         }
         DaemonResponse::Format(DaemonFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
         }
-        DaemonResponse::Pong => {
-            println!("pong");
+        DaemonResponse::PureFormat(DaemonPureFormatResponse::Success(formatted)) => {
+            println!("Success to format");
+            println!("{}", formatted);
+        }
+        DaemonResponse::PureFormat(DaemonPureFormatResponse::Ignored()) => {
+            println!("File ignored");
+        }
+        DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(err)) => {
+            return Err(anyhow!(err));
+        }
+        DaemonResponse::Stop => {
+            println!("Daemon stopped");
+        }
+        DaemonResponse::Pong(info) => {
+            println!("pong!");
+            println!("daemon pid: {}", &info.pid);
+            println!("daemon start time: {}", &info.start_time);
+            println!("daemon log file: {}", &info.stderr_path);
         }
     }
 

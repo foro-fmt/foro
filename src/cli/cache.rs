@@ -1,17 +1,11 @@
-use crate::cli::format::FormatArgs;
-use crate::cli::{format, GlobalOptions};
-use crate::config;
-use crate::config::{get_or_create_default_config, load_config_and_cache, load_file};
-use crate::handle_plugin::run::run;
+use crate::cli::GlobalOptions;
+use crate::config::load_config_and_cache;
 use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
 use log::{debug, error};
-use serde_json::json;
 use std::fs;
-use std::io::{stdin, stdout};
-use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 pub struct CacheCleanArgs {
@@ -25,6 +19,11 @@ pub fn cache_clean_execute_with_args(
 ) -> Result<()> {
     let (_, cache_dir) =
         load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+
+    if !cache_dir.exists() {
+        debug!("cache directory does not exist, so we do nothing");
+        return Ok(());
+    }
 
     if (!(cache_dir.file_name() == Some("foro".as_ref()))) && (!args.yes) {
         debug!("cache directory seems not to be foro cache directory, so we ask the user");
@@ -65,7 +64,7 @@ pub fn cache_dir_execute_with_args(
     let (_, cache_dir) =
         load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
-    println!("Cache Directory: {:?}", cache_dir.canonicalize()?);
+    println!("Cache Directory: {:?}", cache_dir);
 
     Ok(())
 }

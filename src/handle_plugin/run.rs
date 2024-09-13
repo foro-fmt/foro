@@ -1,34 +1,26 @@
-use crate::app_dir::cache_dir_res;
-use crate::config::Command;
-use crate::handle_plugin::load::{_load_module_base, load_local_module, load_url_module};
+use crate::config::{CommandWithControlFlow, PureCommand, SomeCommand, WriteCommand};
+use crate::handle_plugin::load::{load_local_module, load_url_module};
 use anyhow::{anyhow, Context, Result};
 use foro_plugin_utils::data_json_utils::{merge, JsonGetter};
-use log::{debug, info, trace};
+use log::{debug, trace};
 use minijinja;
 use serde_json::{json, Value};
 use shell_words;
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::format;
+use std::fs;
 use std::io::{Read, Write};
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 use std::path::PathBuf;
-use std::rc::Rc;
-use std::str::FromStr;
-use std::sync::{Arc, LazyLock, Mutex, MutexGuard};
-use std::thread::sleep;
-use std::time::Instant;
-use std::{env, fs, thread, time};
+use std::process::ExitStatus;
+use std::sync::{LazyLock, Mutex};
 use url::Url;
-use wasmtime::{
-    AsContextMut, Config, Engine, Instance, Linker, Module, Store, StoreContext, StoreContextMut,
-    Val,
-};
+use wasmtime::{Config, Engine, Instance, Linker, Store};
 use wasmtime_wasi::preview1::WasiP1Ctx;
 use wasmtime_wasi::{preview1, DirPerms, FilePerms, WasiCtxBuilder};
 
 #[derive(Hash, Eq, PartialEq)]
 pub(crate) enum FileSource {
+    #[allow(unused)]
     LocalPath(PathBuf),
     Url(Url),
 }
@@ -108,7 +100,7 @@ pub(crate) fn run_plugin_inner(
 
     let data_ptr = malloc.call(&mut store, (input_data.len() as u64, 0))?;
 
-    &memory.write(&mut store, data_ptr as usize, &input_data)?;
+    memory.write(&mut store, data_ptr as usize, &input_data)?;
 
     trace!("loaded input data");
 
@@ -137,12 +129,12 @@ pub(crate) fn run_plugin_inner(
         return Err(anyhow!("Plugin panicked: {}", err_s));
     }
 
-    if let Some(formatted) = String::get_value_opt(&output_value, ["formatted-content"]) {
-        let target = String::get_value(&cur_map, ["target"])?;
-        fs::write(target, formatted)?;
-
-        trace!("wrote");
-    }
+    // if let Some(formatted) = String::get_value_opt(&output_value, ["formatted-content"]) {
+    //     let target = String::get_value(&cur_map, ["target"])?;
+    //     fs::write(target, formatted)?;
+    //
+    //     trace!("wrote");
+    // }
 
     // drop of store is so slow, another thread dropping is maybe faster
 
@@ -151,7 +143,7 @@ pub(crate) fn run_plugin_inner(
 
 pub(crate) fn run_plugin(
     setting: PluginSetting,
-    cur_map: Value,
+    cur_json: Value,
     cache_path: &PathBuf,
     use_cache: bool,
 ) -> Result<Value> {
@@ -161,14 +153,18 @@ pub(crate) fn run_plugin(
         if let Some((instance, store)) = CACHE_WASM_STORE.lock().unwrap().get(&setting.wasm_source)
         {
             debug!("loaded from in-memory cache");
-            return run_plugin_inner(instance.clone(), store.lock().unwrap().deref_mut(), cur_map);
+            return run_plugin_inner(
+                instance.clone(),
+                store.lock().unwrap().deref_mut(),
+                cur_json,
+            );
         }
     }
 
     let (instance, mut store) = init_instance(&setting, cache_path, use_cache)?;
 
     if use_cache {
-        let res = run_plugin_inner(instance.clone(), &mut store, cur_map);
+        let res = run_plugin_inner(instance.clone(), &mut store, cur_json);
 
         CACHE_WASM_STORE
             .lock()
@@ -178,10 +174,10 @@ pub(crate) fn run_plugin(
         return res;
     }
 
-    run_plugin_inner(instance.clone(), &mut store, cur_map)
+    run_plugin_inner(instance.clone(), &mut store, cur_json)
 }
 
-static CACHE_NATIVE_LIB: LazyLock<Mutex<HashMap<String, (libloading::Library)>>> =
+static CACHE_NATIVE_LIB: LazyLock<Mutex<HashMap<String, libloading::Library>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub(crate) unsafe fn run_plugin_native_inner(
@@ -191,8 +187,12 @@ pub(crate) unsafe fn run_plugin_native_inner(
     let input_data: Vec<u8> = serde_json::to_vec(&cur_map)?;
     let input_len = input_data.len();
 
+    trace!("real run started");
+
     let result_ptr_u64 = func(input_data.as_ptr() as u64, input_len as u64);
     let result_ptr = result_ptr_u64 as *mut u8;
+
+    trace!("real run ended");
 
     let len_part = std::slice::from_raw_parts(result_ptr, 8);
     let len = u64::from_le_bytes(len_part.try_into()?) as usize;
@@ -204,12 +204,12 @@ pub(crate) unsafe fn run_plugin_native_inner(
         return Err(anyhow!("Plugin panicked: {}", err_s));
     }
 
-    if let Some(formatted) = String::get_value_opt(&output_value, ["formatted-content"]) {
-        let target = String::get_value(&cur_map, ["target"])?;
-        fs::write(target, formatted)?;
-
-        trace!("wrote");
-    }
+    // if let Some(formatted) = String::get_value_opt(&output_value, ["formatted-content"]) {
+    //     let target = String::get_value(&cur_map, ["target"])?;
+    //     fs::write(target, formatted)?;
+    //
+    //     trace!("wrote");
+    // }
 
     Ok(output_value)
 }
@@ -217,8 +217,8 @@ pub(crate) unsafe fn run_plugin_native_inner(
 pub(crate) fn run_plugin_native(
     dll_path: &str,
     cur_map: Value,
-    cache_path: &PathBuf,
-    use_cache: bool,
+    _cache_path: &PathBuf,
+    _use_cache: bool,
 ) -> Result<Value> {
     unsafe {
         trace!("0");
@@ -242,101 +242,47 @@ pub(crate) fn run_plugin_native(
 
         trace!("loaded function");
 
-        let input_data: Vec<u8> = serde_json::to_vec(&cur_map)?;
-        let input_len = input_data.len();
-
-        let result_ptr_u64 = func(input_data.as_ptr() as u64, input_len as u64);
-        let result_ptr = result_ptr_u64 as *mut u8;
-
-        let len_part = std::slice::from_raw_parts(result_ptr, 8);
-        let len = u64::from_le_bytes(len_part.try_into()?) as usize;
-
-        let output_data = std::slice::from_raw_parts(result_ptr.add(8), len);
-        let output_value: Value = serde_json::from_slice(output_data)?;
+        let res = run_plugin_native_inner(func, cur_map);
 
         CACHE_NATIVE_LIB
             .lock()
             .unwrap()
             .insert(dll_path.to_string(), lib);
 
-        Ok(output_value)
+        res
     }
 }
 
-pub fn run(
-    command: &Command,
+fn run_inner_pure_command(
+    command: &PureCommand,
     mut cur_json: Value,
     cache_path: &PathBuf,
     use_cache: bool,
 ) -> Result<Value> {
-    debug!("run command: {:?}", command);
-    // debug!("data-json: {:?}", &cur_json);
-
-    let res = match command {
-        Command::PluginUrl(url) => {
+    match command {
+        PureCommand::PluginUrl(url) => {
             let setting = PluginSetting {
                 wasm_source: FileSource::Url(url.clone().into_inner()),
                 cache: true,
             };
-            run_plugin(setting, cur_json, cache_path, use_cache)
+
+            let res = run_plugin(setting, cur_json.clone(), cache_path, use_cache)?;
+
+            merge(&mut cur_json, &res);
+
+            Ok(cur_json)
         }
-        Command::SimpleCommand(cmd) => {
+        PureCommand::CommandIO { io: cmd } => {
             let env = minijinja::Environment::new();
             let rendered_cmd = env.render_str(cmd, &cur_json)?;
 
-            let output = if cfg!(target_os = "windows") {
-                let words = winsplit::split(&rendered_cmd);
-                let (exec, args) = words.split_first().context("Empty command")?;
-                let current_dir = String::get_value(&cur_json, ["current-dir"])?;
-
-                debug!(
-                    "exec: {:?}, args: {:?}, current_dir: {:?}",
-                    exec, args, current_dir
-                );
-
-                let mut output = std::process::Command::new(exec)
-                    .args(args)
-                    .current_dir(current_dir)
-                    .spawn()
-                    .context("Failed to execute command")?;
-
-                output.wait()?;
-
-                trace!("output: {:?}", output);
-            } else {
-                let words = shell_words::split(&rendered_cmd)?;
-                let (exec, args) = words.split_first().context("Empty command")?;
-                let current_dir = String::get_value(&cur_json, ["current-dir"])?;
-
-                debug!(
-                    "exec: {:?}, args: {:?}, current_dir: {:?}",
-                    exec, args, current_dir
-                );
-
-                let mut output = std::process::Command::new(exec)
-                    .args(args)
-                    .current_dir(current_dir)
-                    .spawn()
-                    .context("Failed to execute command")?;
-
-                output.wait()?;
-
-                trace!("output: {:?}", output);
-            };
-
-            Ok(json!({}))
-        }
-        Command::CommandIO { io: cmd } => {
-            let env = minijinja::Environment::new();
-            let rendered_cmd = env.render_str(cmd, &cur_json)?;
-
-            let output = if cfg!(target_os = "windows") {
+            if cfg!(target_os = "windows") {
                 // memo: we can use https://github.com/chipsenkbeil/winsplit-rs
                 todo!("Windows is not supported yet")
             } else {
                 let words = shell_words::split(&rendered_cmd)?;
                 let (exec, args) = words.split_first().context("Empty command")?;
-                let target_path = String::get_value(&cur_json, ["target"])?;
+                let _target_path = String::get_value(&cur_json, ["target"])?;
                 let target_content = String::get_value(&cur_json, ["target-content"])?;
                 let current_dir = String::get_value(&cur_json, ["current-dir"])?;
 
@@ -361,59 +307,214 @@ pub fn run(
 
                 drop(stdin);
 
-                trace!("writed",);
+                trace!("writed");
 
-                let mut stdout = child.stdout.as_mut().unwrap();
+                let exit_status = child.wait()?;
 
-                let mut buf = String::new();
-                stdout.read_to_string(&mut buf)?;
+                if exit_status.success() {
+                    let stdout = child.stdout.as_mut().unwrap();
 
-                debug!("write to {}", target_path);
+                    let mut buf = String::new();
+                    stdout.read_to_string(&mut buf)?;
 
-                fs::write(target_path, buf.clone())?;
+                    let cur_json_m = cur_json.as_object_mut().unwrap();
+                    cur_json_m.insert("format-status".to_string(), json!("success"));
+                    cur_json_m.insert("formatted-content".to_string(), json!(buf));
+                } else {
+                    let stderr = child.stderr.as_mut().unwrap();
+
+                    let mut buf = String::new();
+                    stderr.read_to_string(&mut buf)?;
+
+                    let cur_json_m = cur_json.as_object_mut().unwrap();
+                    cur_json_m.insert("format-status".to_string(), json!("error"));
+                    cur_json_m.insert("format-error".to_string(), json!(buf));
+                }
             };
-
-            Ok(json!({}))
-        }
-        Command::Finding {
-            finding,
-            if_found,
-            else_,
-        } => {
-            let finding_res = run(finding, cur_json.clone(), cache_path, use_cache)?;
-
-            merge(&mut cur_json, &finding_res);
-
-            if bool::get_value(&finding_res, ["found"]).unwrap_or(false) {
-                run(if_found, cur_json, cache_path, use_cache)
-            } else {
-                let res = run(else_, cur_json.clone(), cache_path, use_cache)?;
-
-                Ok(res)
-            }
-        }
-        Command::Sequential(commands) => {
-            for command in commands {
-                let res = run(command, cur_json.clone(), cache_path, use_cache)?;
-
-                merge(&mut cur_json, &res);
-            }
 
             Ok(cur_json)
         }
-        Command::NativeDll {
+        PureCommand::NativeDll {
             native_dll: dll_path,
         } => {
             let res = run_plugin_native(dll_path, cur_json.clone(), cache_path, use_cache)?;
+
+            merge(&mut cur_json, &res);
 
             // debug!("done native: {:?}", res);
 
             Ok(cur_json)
         }
+    }
+}
+
+fn run_inner_write_command(
+    command: &WriteCommand,
+    cur_json: Value,
+    cache_path: &PathBuf,
+    use_cache: bool,
+) -> Result<Value> {
+    match command {
+        WriteCommand::SimpleCommand(cmd) => {
+            let env = minijinja::Environment::new();
+            let rendered_cmd = env.render_str(cmd, &cur_json)?;
+
+            #[cfg(unix)]
+            let words = shell_words::split(&rendered_cmd)?;
+            #[cfg(windows)]
+            let words = winsplit::split(&rendered_cmd);
+
+            let (exec, args) = words.split_first().context("Empty command")?;
+            let current_dir = String::get_value(&cur_json, ["current-dir"])?;
+
+            debug!(
+                "exec: {:?}, args: {:?}, current_dir: {:?}",
+                exec, args, current_dir
+            );
+
+            let mut output = std::process::Command::new(exec)
+                .args(args)
+                .current_dir(current_dir)
+                .spawn()
+                .context("Failed to execute command")?;
+
+            output.wait()?;
+
+            trace!("output: {:?}", output);
+
+            Ok(json!({}))
+        }
+        WriteCommand::Pure(pure) => {
+            let res = run_inner_pure_command(pure, cur_json.clone(), cache_path, use_cache)?;
+
+            let target_path = String::get_value(&cur_json, ["target"])?;
+            if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
+                fs::write(target_path, formatted)?;
+            }
+
+            Ok(res)
+        }
+    }
+}
+
+fn run_flow<T>(
+    command_with_control_flow: &CommandWithControlFlow<T>,
+    run_inner: fn(&T, Value, &PathBuf, bool) -> Result<Value>,
+    mut cur_json: Value,
+    cache_path: &PathBuf,
+    use_cache: bool,
+) -> Result<Value> {
+    match command_with_control_flow {
+        CommandWithControlFlow::If {
+            run,
+            cond,
+            on_true,
+            on_false,
+        } => {
+            trace!("if");
+
+            let run_res = run_flow(run, run_inner, cur_json, cache_path, use_cache)?;
+
+            let env = minijinja::Environment::new();
+            let cond_expr = env.compile_expression(cond)?;
+            let cond_res = cond_expr.eval(&run_res)?;
+            let cond_bool = cond_res.is_true();
+
+            trace!("cond: {:?}", cond);
+            trace!("cond_bool: {:?}", cond_bool);
+
+            let res = if cond_bool {
+                run_flow(on_true, run_inner, run_res, cache_path, use_cache)
+            } else {
+                run_flow(on_false, run_inner, run_res, cache_path, use_cache)
+            }?;
+
+            trace!("if done");
+
+            Ok(res)
+        }
+        CommandWithControlFlow::Sequential(seq) => {
+            trace!("seq");
+
+            for command in seq {
+                cur_json = run_flow(command, run_inner, cur_json, cache_path, use_cache)?;
+            }
+
+            trace!("seq done");
+
+            Ok(cur_json)
+        }
+        CommandWithControlFlow::Command(cmd) => {
+            trace!("cmd");
+
+            let res = run_inner(cmd, cur_json, cache_path, use_cache)?;
+
+            trace!("cmd done");
+
+            Ok(res)
+        }
+    }
+}
+
+pub fn run(
+    some_command: &SomeCommand,
+    cur_json: Value,
+    cache_path: &PathBuf,
+    use_cache: bool,
+) -> Result<Value> {
+    debug!("run command: {:?}", some_command);
+    // debug!("data-json: {:?}", &cur_json);
+
+    let res = match some_command {
+        SomeCommand::Pure { cmd } => {
+            let target_path = String::get_value(&cur_json, ["target"])?;
+
+            let res = run_flow(cmd, run_inner_pure_command, cur_json, cache_path, use_cache)?;
+
+            if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
+                fs::write(target_path, formatted)?;
+            }
+
+            res
+        }
+        SomeCommand::Write { write_cmd } => {
+            let res = run_flow(
+                write_cmd,
+                run_inner_write_command,
+                cur_json,
+                cache_path,
+                use_cache,
+            )?;
+
+            res
+        }
     };
 
-    debug!("done command: {:?}", command);
+    debug!("done command: {:?}", some_command);
     // debug!("data-json: {:?}", &res);
 
-    res
+    Ok(res)
+}
+
+pub fn run_pure(
+    command: &CommandWithControlFlow<PureCommand>,
+    cur_json: Value,
+    cache_path: &PathBuf,
+    use_cache: bool,
+) -> Result<Value> {
+    debug!("run pure command: {:?}", command);
+    // debug!("data-json: {:?}", &cur_json);
+
+    let res = run_flow(
+        command,
+        run_inner_pure_command,
+        cur_json,
+        cache_path,
+        use_cache,
+    )?;
+
+    debug!("done pure command: {:?}", command);
+    // debug!("data-json: {:?}", &res);
+
+    Ok(res)
 }

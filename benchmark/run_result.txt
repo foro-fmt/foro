@@ -1,0 +1,40 @@
+Running benchmarks...
+
+
+
+Running benchmark for biome...
+
+Benchmark 1: npx biome format --write ./test.tsx
+  Time (mean ± σ):     310686.1 µs ± 6468.0 µs    [User: 282145.2 µs, System: 60353.1 µs]
+  Range (min … max):   302302.6 µs … 320297.7 µs    10 runs
+ 
+Benchmark 2: ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./test.tsx
+  Time (mean ± σ):     5442.0 µs ± 229.7 µs    [User: 1909.4 µs, System: 5288.0 µs]
+  Range (min … max):   4846.3 µs … 6494.5 µs    461 runs
+ 
+Benchmark 3: /home/nahco314/RustroverProjects/foro/target/release/foro format ./test.tsx
+  Time (mean ± σ):     2190.5 µs ± 245.5 µs    [User: 1061.6 µs, System: 413.3 µs]
+  Range (min … max):   1939.0 µs … 8669.5 µs    1088 runs
+ 
+Summary
+  /home/nahco314/RustroverProjects/foro/target/release/foro format ./test.tsx ran
+    2.48 ± 0.30 times faster than ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./test.tsx
+  141.83 ± 16.17 times faster than npx biome format --write ./test.tsx
+CompletedProcess(args=['hyperfine', '-N', '--time-unit', 'microsecond', '--style', 'basic', 'npx biome format --write ./test.tsx', './node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./test.tsx', '/home/nahco314/RustroverProjects/foro/target/release/foro format ./test.tsx'], returncode=0)
+
+
+
+Running benchmark for ruff format...
+
+Benchmark 1: ruff format ./src/ruff_test/main.py
+  Time (mean ± σ):     7588.1 µs ± 320.4 µs    [User: 3211.4 µs, System: 10466.9 µs]
+  Range (min … max):   6969.5 µs … 9034.9 µs    364 runs
+ 
+Benchmark 2: /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/main.py
+  Time (mean ± σ):     2187.0 µs ± 228.5 µs    [User: 1040.3 µs, System: 443.6 µs]
+  Range (min … max):   1941.6 µs … 8680.7 µs    1078 runs
+ 
+Summary
+  /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/main.py ran
+    3.47 ± 0.39 times faster than ruff format ./src/ruff_test/main.py
+CompletedProcess(args=['hyperfine', '-N', '--time-unit', 'microsecond', '--style', 'basic', 'ruff format ./src/ruff_test/main.py', '/home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/main.py'], returncode=0)

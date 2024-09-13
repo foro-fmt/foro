@@ -40,6 +40,7 @@ foro format --no-daemon ./main.tsx
 
 ### Windows 上での注意
 
+- Windows では、アタッチしない daemon の開始と、format コマンドによる daemon の自動開始がサポートされていません！事前に明示的に `foro daemon start -a` を実行してください。
 - Windows では OS の仕様上 unix ほどフォーマットの速度が出ません。それでも Windows 上で普通にコマンドを実行するよりは高速ですが、WSL などから実行することをおすすめします。
   - ちなみに、Windows 上で foro を実行する場合、`--config-path` や `--socket-dir` を引数で明示してやると 2ms 程度高速になります。
 - Windows 上でのプロセス間通信に Unix Domain Socket を使用しているため、対応している Windows 10 以上の最近のバージョンである必要があります。

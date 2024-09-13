@@ -1,26 +1,38 @@
-use crate::cli::execute;
-use std::str::FromStr;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
-use std::{env, process};
+#![feature(test)]
+
+use crate::cli::{execute, GlobalOptions};
+use std::env;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 mod app_dir;
 mod cli;
 mod config;
 mod daemon;
-mod format;
 mod handle_plugin;
+mod process_utils;
 
-use handle_plugin::load::load_url_module;
-
-use anyhow::{Context, Result};
-use log::LevelFilter;
-use serde_json::{json, Value};
-use url::Url;
-use wasmtime::{Config, Engine, Linker, Store};
-use wasmtime_wasi::{preview1, DirPerms, FilePerms, WasiCtxBuilder};
+use crate::daemon::interface::{DaemonCommandPayload, DaemonCommands, DaemonFormatArgs};
+use anyhow::Result;
 
 fn main() -> Result<()> {
     // env::set_var("LD_LIBRARY_PATH", "/home/nahco314/.rustup/toolchains/nightly-2024-08-17-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib:");
+
+    eprintln!(
+        "{:?}",
+        serde_json::to_string(&DaemonCommandPayload {
+            command: DaemonCommands::Format(DaemonFormatArgs {
+                path: PathBuf::from("./asd")
+            }),
+            current_dir: env::current_dir().unwrap(),
+            global_options: GlobalOptions {
+                config_file: None,
+                cache_dir: None,
+                socket_dir: None,
+                no_cache: false,
+            },
+        })
+    );
 
     let now = SystemTime::now();
 
@@ -33,7 +45,7 @@ fn main() -> Result<()> {
 
     // マイクロ秒単位の精度を計算
     let microseconds = nanoseconds / 1_000;
-    println!("{}.{:06}", seconds, microseconds);
+    eprintln!("{}.{:06}", seconds, microseconds);
 
     let r = execute();
 
@@ -48,7 +60,7 @@ fn main() -> Result<()> {
 
     // マイクロ秒単位の精度を計算
     let microseconds = nanoseconds / 1_000;
-    println!("{}.{:06}", seconds, microseconds);
+    eprintln!("{}.{:06}", seconds, microseconds);
 
     r
 }

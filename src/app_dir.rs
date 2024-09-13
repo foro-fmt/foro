@@ -1,8 +1,5 @@
 use anyhow::{Context, Result};
-use std::cell::LazyCell;
-use std::path::{Path, PathBuf};
-use std::sync::{LazyLock, OnceLock};
-use log::trace;
+use std::path::PathBuf;
 
 pub(crate) fn config_file() -> Option<PathBuf> {
     let mut a = dirs::config_dir()?;
@@ -31,7 +28,14 @@ pub(crate) fn socket_dir() -> Option<PathBuf> {
     Some(a)
 }
 
+pub(crate) fn log_dir() -> Option<PathBuf> {
+    // is this correct?
+    let mut a = socket_dir()?;
+    a.push("log");
+    Some(a)
+}
 
+#[allow(unused)]
 pub(crate) fn config_file_res() -> Result<PathBuf> {
     config_file().context("Failed to get default config file")
 }
@@ -42,4 +46,8 @@ pub(crate) fn cache_dir_res() -> Result<PathBuf> {
 
 pub(crate) fn socket_dir_res() -> Result<PathBuf> {
     socket_dir().context("Failed to get default socket dir")
+}
+
+pub(crate) fn log_dir_res() -> Result<PathBuf> {
+    log_dir().context("Failed to get default log dir")
 }

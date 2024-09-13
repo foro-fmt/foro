@@ -1,17 +1,10 @@
-use crate::app_dir::{cache_dir, cache_dir_res, config_file, socket_dir_res};
-use crate::cli::GlobalOptions;
+use crate::app_dir::{cache_dir_res, config_file, socket_dir_res};
 use anyhow::{anyhow, Context, Result};
-use clap::builder::Str;
-use log::{debug, info, trace};
-use serde::de::{Error, SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::Value;
-use std::collections::BTreeMap;
-use std::fmt::Write;
+use log::{debug, info};
+use serde::{Deserialize, Serialize};
+use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
-use std::{fs, io};
-use url::Url;
 use url_serde;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -32,42 +25,72 @@ impl OnRule {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum SomePath {
-    SinglePath(PathBuf),
-    Or(Vec<PathBuf>),
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub enum Command {
+pub enum PureCommand {
     PluginUrl(url_serde::SerdeUrl),
-    SimpleCommand(String),
     CommandIO {
         io: String,
     },
-    Finding {
-        finding: Box<Command>,
-        if_found: Box<Command>,
-        #[serde(rename = "else")]
-        else_: Box<Command>,
-    },
-    Sequential(Vec<Command>),
     NativeDll {
         #[serde(rename = "__deprecation_native_dll")]
         native_dll: String,
     },
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum WriteCommand {
+    Pure(PureCommand),
+    SimpleCommand(String),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum CommandWithControlFlow<T> {
+    If {
+        run: Box<CommandWithControlFlow<T>>,
+        cond: String,
+        on_true: Box<CommandWithControlFlow<T>>,
+        on_false: Box<CommandWithControlFlow<T>>,
+    },
+    Sequential(Vec<CommandWithControlFlow<T>>),
+    Command(T),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum SomeCommand {
+    Pure {
+        cmd: CommandWithControlFlow<PureCommand>,
+    },
+    Write {
+        write_cmd: CommandWithControlFlow<WriteCommand>,
+    },
+}
+
+impl SomeCommand {
+    pub fn is_pure(&self) -> bool {
+        match self {
+            SomeCommand::Pure { .. } => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Rule {
     pub on: OnRule,
-    pub cmd: Command,
+    #[serde(flatten)]
+    pub some_cmd: SomeCommand,
 }
 
 impl Rule {
-    pub fn on_match(&self, target_path: &PathBuf) -> bool {
+    pub fn on_match(&self, target_path: &PathBuf, force_pure: bool) -> bool {
+        if force_pure && !self.some_cmd.is_pure() {
+            return false;
+        }
+
         self.on.on_match(target_path)
     }
 }
@@ -81,18 +104,14 @@ pub struct Config {
     pub socket_dir: Option<PathBuf>,
 }
 
-fn true_() -> bool {
-    true
-}
-
 fn none<T>() -> Option<T> {
     None
 }
 
 impl Config {
-    pub fn find_matched_rule(&self, target_path: &PathBuf) -> Option<Rule> {
+    pub fn find_matched_rule(&self, target_path: &PathBuf, force_pure: bool) -> Option<Rule> {
         for rule in &self.rules {
-            if rule.on_match(target_path) {
+            if rule.on_match(target_path, force_pure) {
                 return Some(rule.clone());
             }
         }
@@ -101,6 +120,7 @@ impl Config {
     }
 }
 
+#[allow(unused)]
 pub fn load_str(json: &str) -> Result<Config> {
     serde_json::from_str(json).map_err(|e| anyhow!(e))
 }
@@ -113,7 +133,7 @@ pub fn load_file(path: &PathBuf) -> Result<Config> {
 }
 
 pub(crate) fn get_or_create_default_config() -> Option<PathBuf> {
-    let mut config_path = config_file()?;
+    let config_path = config_file()?;
 
     if !config_path.exists() {
         debug!("try create default config file: {:?}", config_path);
@@ -160,12 +180,13 @@ pub(crate) fn load_config_and_cache(
         .context("Could not get config directory")?;
 
     let config = load_file(&config_file)
-        .context(format!("Failed to load config file ({:?})", &config_file).to_string())?;
+        .with_context(|| format!("Failed to load config file ({:?})", &config_file))?;
 
     let cache_dir = given_cache_dir
         .clone()
         .or(config.cache_dir.clone())
-        .unwrap_or(cache_dir_res()?);
+        .or_else(|| cache_dir_res().ok())
+        .context("Failed to get cache directory")?;
 
     debug!("config file: {:?}", &config_file);
     debug!("config: {:?}", &config);
@@ -184,7 +205,7 @@ pub(crate) fn load_config_and_socket(
         .context("Failed to get config directory")?;
 
     let config = load_file(&config_file)
-        .context(format!("Failed to load config file ({:?})", &config_file).to_string())?;
+        .with_context(|| format!("Failed to load config file ({:?})", &config_file))?;
 
     let socket_dir = given_socket_dir
         .clone()
@@ -197,4 +218,32 @@ pub(crate) fn load_config_and_socket(
     debug!("socket dir: {:?}", &socket_dir);
 
     Ok((config, socket_dir))
+}
+
+pub(crate) fn load_paths(
+    given_config_file: &Option<PathBuf>,
+    given_cache_dir: &Option<PathBuf>,
+    given_socket_dir: &Option<PathBuf>,
+) -> Result<(PathBuf, PathBuf, PathBuf)> {
+    let config_file = given_config_file
+        .clone()
+        .or_else(get_or_create_default_config)
+        .context("Failed to get config directory")?;
+
+    let config = load_file(&config_file)
+        .with_context(|| format!("Failed to load config file ({:?})", &config_file))?;
+
+    let cache_dir = given_cache_dir
+        .clone()
+        .or(config.cache_dir.clone())
+        .or_else(|| cache_dir_res().ok())
+        .context("Failed to get cache directory")?;
+
+    let socket_dir = given_socket_dir
+        .clone()
+        .or(config.socket_dir.clone())
+        .or_else(|| socket_dir_res().ok())
+        .context("Failed to get socket directory")?;
+
+    Ok((config_file, cache_dir, socket_dir))
 }

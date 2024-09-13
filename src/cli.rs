@@ -1,24 +1,23 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
 use clap_verbosity_flag::InfoLevel;
-use env_logger::fmt::Timestamp;
-use env_logger::TimestampPrecision;
-use std::cell::{OnceCell, RefCell};
+use std::cell::OnceCell;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::sleep;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
 mod cache;
 mod daemon;
 pub mod format;
+mod internal;
 
 use format::*;
 
 use crate::cli::cache::{cache_execute_with_args, CacheArgs};
 use crate::cli::daemon::{daemon_execute_with_args, DaemonArgs};
-use log::{debug, info, logger, trace, warn};
+use crate::cli::internal::{internal_execute_with_args, InternalArgs};
+use log::trace;
 use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug)]
@@ -26,6 +25,8 @@ pub enum SubCommands {
     Cache(CacheArgs),
     Daemon(DaemonArgs),
     Format(FormatArgs),
+    #[clap(hide = true)]
+    Internal(InternalArgs),
 }
 
 #[derive(Parser, Serialize, Deserialize, Debug)]
@@ -37,6 +38,10 @@ pub struct GlobalOptions {
     /// The path to directory to use for caching
     #[arg(long, value_name = "PATH")]
     pub cache_dir: Option<PathBuf>,
+
+    /// The path to directory to use for the daemon socket
+    #[arg(long, value_name = "PATH")]
+    pub socket_dir: Option<PathBuf>,
 
     /// Avoid reading from or writing to the cache
     #[arg(long, default_value = "false")]
@@ -114,6 +119,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
         SubCommands::Cache(s_args) => cache_execute_with_args(s_args, global_options),
         SubCommands::Daemon(s_args) => daemon_execute_with_args(s_args, global_options),
         SubCommands::Format(s_args) => format_execute_with_args(s_args, global_options),
+        SubCommands::Internal(s_args) => internal_execute_with_args(s_args, global_options),
     }?;
 
     trace!("end foro");
