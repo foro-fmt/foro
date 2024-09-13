@@ -29,66 +29,73 @@ pub struct FormatArgs {
 }
 
 pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions) -> Result<()> {
-    let no_quick_magic =
-        std::env::var_os("FORO_NO_QUICK_MAGIC").is_some_and(|s| s != "0" && s != "");
+    let no_quick_trick = std::env::var_os("FORO_NO_QUICK_TRICK").is_some();
 
-    debug!("no_quick_magic: {}", no_quick_magic);
+    debug!("no_quick_trick: {}", no_quick_trick);
 
     let mut maybe_write: Option<PipeWriter> = None;
 
-    if !no_quick_magic {
+    // platform-dependent: for now, quick trick is only available on UNIX
+    #[cfg(unix)]
+    if !no_quick_trick {
         let target_path = args.path.canonicalize()?;
 
         let (mut reader, mut writer) = os_pipe::pipe()?;
 
-        info!("open pipe");
+        debug!("open pipe");
 
-        // platform-dependent: fork with nix is only available on unix
-        match unsafe { fork()? } {
-            ForkResult::Parent { child } => {
-                let metadata = fs::metadata(&target_path)?;
-                let modified_time = metadata.modified()?;
-
-                loop {
+        #[cfg(unix)]
+        {
+            match unsafe { fork()? } {
+                ForkResult::Parent { child: _child } => {
                     let metadata = fs::metadata(&target_path)?;
-                    let new_modified_time = metadata.modified()?;
+                    let modified_time = metadata.modified()?;
 
-                    if new_modified_time != modified_time {
-                        info!("quick magic detected file changed");
-                        break;
+                    loop {
+                        let metadata = fs::metadata(&target_path)?;
+                        let new_modified_time = metadata.modified()?;
+
+                        if new_modified_time != modified_time {
+                            debug!("quick trick detected file changed");
+                            break;
+                        }
+
+                        // little hack: os_pipe supports only reading with blocking,
+                        //   so we write a dummy byte and read 1 byte,
+                        //   then check if it is dummy or not
+                        writer.write_all(b"0")?;
+                        let mut output = [0];
+                        reader.read_exact(&mut output)?;
+
+                        if output[0] == b'1' {
+                            debug!("quick trick detected child finished");
+                            break;
+                        }
+
+                        sleep(time::Duration::from_micros(100));
                     }
 
-                    writer.write_all(b"0")?;
-                    let mut output = [0];
-                    reader.read_exact(&mut output)?;
+                    debug!("main process exit");
 
-                    if output[0] == b'1' {
-                        info!("quick magic detected child finished");
-                        break;
-                    }
+                    let now = SystemTime::now();
 
-                    sleep(time::Duration::from_micros(100));
+                    // UNIXエポックからの経過時間を取得
+                    let since_the_epoch =
+                        now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+
+                    // 秒とナノ秒をそれぞれ取得
+                    let seconds = since_the_epoch.as_secs();
+                    let nanoseconds = since_the_epoch.subsec_nanos();
+
+                    // マイクロ秒単位の精度を計算
+                    let microseconds = nanoseconds / 1_000;
+                    println!("{}.{:06}", seconds, microseconds);
+
+                    process::exit(0);
                 }
-
-                info!("main process exit");
-
-                let now = SystemTime::now();
-
-                // UNIXエポックからの経過時間を取得
-                let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-
-                // 秒とナノ秒をそれぞれ取得
-                let seconds = since_the_epoch.as_secs();
-                let nanoseconds = since_the_epoch.subsec_nanos();
-
-                // マイクロ秒単位の精度を計算
-                let microseconds = nanoseconds / 1_000;
-                println!("{}.{:06}", seconds, microseconds);
-
-                process::exit(0);
-            }
-            ForkResult::Child => {
-                maybe_write = Some(writer);
+                ForkResult::Child => {
+                    maybe_write = Some(writer);
+                }
             }
         }
     }
@@ -107,7 +114,7 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
         .find_matched_rule(&target_path)
         .context("No rule matched")?;
 
-    info!("run rule: {:?}", rule);
+    debug!("run rule: {:?}", rule);
 
     let res = run(
         &rule.cmd,

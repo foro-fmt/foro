@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use clap_verbosity_flag::InfoLevel;
 use env_logger::fmt::Timestamp;
 use env_logger::TimestampPrecision;
 use std::cell::{OnceCell, RefCell};
@@ -17,7 +18,7 @@ use format::*;
 
 use crate::cli::cache::{cache_execute_with_args, CacheArgs};
 use crate::cli::daemon::{daemon_execute_with_args, DaemonArgs};
-use log::{debug, info, logger, warn};
+use log::{debug, info, logger, trace, warn};
 use nix::libc::write;
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +50,7 @@ pub struct Command {
     pub subcommand: SubCommands,
 
     #[command(flatten)]
-    pub verbose: clap_verbosity_flag::Verbosity,
+    pub verbose: clap_verbosity_flag::Verbosity<InfoLevel>,
 
     #[command(flatten)]
     pub global_options: GlobalOptions,
@@ -106,7 +107,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
         })
         .init();
 
-    debug!("start foro: {:?}", &args);
+    trace!("start foro: {:?}", &args);
 
     let global_options = args.global_options;
 
@@ -116,7 +117,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
         SubCommands::Format(s_args) => format_execute_with_args(s_args, global_options),
     }?;
 
-    debug!("end foro");
+    trace!("end foro");
 
     Ok(())
 }

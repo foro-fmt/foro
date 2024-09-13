@@ -78,6 +78,7 @@ pub(crate) fn _load_module_base_with_cache(
 
 pub(crate) fn _load_module_base(
     engine: &Engine,
+    module_name_for_log: &str,
     lazy_module_bin: impl Fn() -> Result<Vec<u8>>,
     cache_path: impl AsRef<Path>,
     use_cache: bool,
@@ -85,7 +86,7 @@ pub(crate) fn _load_module_base(
     if use_cache {
         _load_module_base_with_cache(engine, lazy_module_bin, cache_path)
     } else {
-        info!("loading module (no cache!)");
+        info!("loading module {} (no cache!)", module_name_for_log);
 
         let bin_module = lazy_module_bin()?;
         let module = Module::from_binary(&engine, bin_module.as_slice())?;
@@ -107,8 +108,14 @@ pub(crate) fn load_local_module(
         cache_path.push(component);
     }
 
+    let module_path_name = module_path
+        .as_ref()
+        .to_str()
+        .context("Failed to get file name")?;
+
     _load_module_base(
         engine,
+        module_path_name,
         || Ok(fs::read(module_path.clone())?),
         cache_path,
         use_cache,
@@ -127,6 +134,8 @@ pub(crate) fn load_url_module(
     let encoded = urlencoding::encode(url.as_str());
     cache_path.push(&encoded.to_string());
 
+    let url_as_str = url.as_str();
+
     let download = || {
         info!("fetching {}", url);
 
@@ -139,5 +148,5 @@ pub(crate) fn load_url_module(
         Ok(response.bytes()?.to_vec())
     };
 
-    _load_module_base(engine, download, cache_path, use_cache)
+    _load_module_base(engine, url_as_str, download, cache_path, use_cache)
 }

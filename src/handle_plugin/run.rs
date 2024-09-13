@@ -233,8 +233,6 @@ pub(crate) fn run_plugin_native(
 
         trace!("1");
 
-        info!("{:?}", env::var("LD_LIBRARY_PATH"));
-
         let lib = libloading::Library::new(dll_path)?;
         trace!("2");
 
@@ -306,7 +304,7 @@ pub fn run(
 
                 output.wait()?;
 
-                debug!("output: {:?}", output);
+                trace!("output: {:?}", output);
             };
 
             Ok(json!({}))

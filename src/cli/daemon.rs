@@ -7,9 +7,9 @@ use crate::cli::cache::CacheSubCommands;
 use crate::cli::format::FormatArgs;
 use crate::cli::GlobalOptions;
 use crate::config::{load_config_and_cache, load_config_and_socket};
-use crate::daemon::client::{ping, run_command, run_command_inner};
-use crate::daemon::interface::DaemonCommands;
-use crate::daemon::server::{daemon_main, start_daemon, WrappedUnixSocket};
+use crate::daemon::client::{ping, run_command};
+use crate::daemon::interface::{DaemonCommands, DaemonSocketPath};
+use crate::daemon::server::{start_daemon, WrappedUnixSocket};
 use crate::handle_plugin::run::run;
 use crate::main;
 use anyhow::{anyhow, Result};
@@ -40,8 +40,7 @@ pub fn daemon_start_execute_with_args(
     let (_, socket_dir) =
         load_config_and_socket(&global_options.config_file, &daemon_global.socket_path)?;
 
-    let mut socket = socket_dir.clone();
-    socket.push("daemon-cmd.sock");
+    let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
     start_daemon(&socket, args.attach)
 }
@@ -81,8 +80,7 @@ pub fn daemon_execute_with_args(args: DaemonArgs, global_options: GlobalOptions)
                 &args.global_options.socket_path,
             )?;
 
-            let mut socket = socket_dir.clone();
-            socket.push("daemon-cmd.sock");
+            let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
             run_command(
                 command,

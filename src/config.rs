@@ -102,7 +102,7 @@ impl Config {
 }
 
 pub fn load_str(json: &str) -> Result<Config> {
-    serde_json::from_str(json).context("Failed to parse JSON")
+    serde_json::from_str(json).map_err(|e| anyhow!(e))
 }
 
 pub fn load_file(path: &PathBuf) -> Result<Config> {
@@ -113,7 +113,7 @@ pub fn load_file(path: &PathBuf) -> Result<Config> {
 }
 
 pub(crate) fn get_or_create_default_config() -> Option<PathBuf> {
-    let mut config_path = config_file()?;
+    let mut config_path = config_file()?.canonicalize().ok()?;
 
     if !config_path.exists() {
         debug!("try create default config file: {:?}", config_path);
@@ -126,20 +126,25 @@ pub(crate) fn get_or_create_default_config() -> Option<PathBuf> {
         let default_config = r#"{
     "rules": [
         {
-            "on": [".ts", "tsx"],
-            "cmd": {
-                "finding": "https://github.com/nahco314/foro-find-biome/releases/download/v0.0.1/foro_find_biome.wasm",
-                "if_found": "{{ biome }} format --write {{ target }}",
-                "else": "http://0.0.0.0:8000/target/wasm32-wasi/super-release/foro_biome_fallback.wasm"
-            }
+            "on": [".ts", ".tsx", ".json"],
+            "cmd": "https://github.com/nahco314/foro-biome/releases/latest/download/foro_biome.wasm"
+        },
+        {
+            "on": ".rs",
+            "cmd": "rustfmt +nightly --unstable-features --skip-children {{ target }}"
+        },
+        {
+            "on": ".py",
+            "cmd": "https://github.com/nahco314/foro-ruff/releases/latest/download/foro_ruff.wasm"
         }
     ]
 }
 "#;
 
-        fs::write(&config_path, default_config).ok()?;
+        fs::write(&config_path, &default_config).ok()?;
 
         info!("created default config file: {:?}", config_path);
+        info!("content: {:?}", default_config);
     }
 
     Some(config_path)
