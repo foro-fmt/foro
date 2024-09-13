@@ -37,3 +37,4 @@ notify = "6.1.1"
 libloading = "0.8.5"
 filemq = { git = "https://github.com/nahco314/filemq", version = "0.1.0" }
 winsplit = "0.1.0"
+uds_windows = "1.1.0"

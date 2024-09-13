@@ -13,7 +13,7 @@ use crate::handle_plugin::run::run;
 use crate::main;
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use os_pipe::PipeWriter;
 use serde_json::json;
 use std::io::prelude::*;
@@ -36,7 +36,7 @@ pub fn daemon_start_execute_with_args(
     daemon_global: DaemonGlobalOptions,
 ) -> Result<()> {
     let (_, socket_dir) =
-        load_config_and_socket(&global_options.config_file, &daemon_global.socket_path)?;
+        load_config_and_socket(&global_options.config_file, &daemon_global.socket_dir)?;
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
@@ -53,7 +53,7 @@ pub enum DaemonSubcommands {
 #[derive(Parser, Debug)]
 pub struct DaemonGlobalOptions {
     #[arg(long, value_name = "PATH")]
-    pub socket_path: Option<PathBuf>,
+    pub socket_dir: Option<PathBuf>,
     #[arg(long)]
     pub no_auto_start: bool,
 }
@@ -75,7 +75,7 @@ pub fn daemon_execute_with_args(args: DaemonArgs, global_options: GlobalOptions)
         DaemonSubcommands::ServerCommands(command) => {
             let (_, socket_dir) = load_config_and_socket(
                 &global_options.config_file,
-                &args.global_options.socket_path,
+                &args.global_options.socket_dir,
             )?;
 
             let socket = DaemonSocketPath::from_socket_dir(&socket_dir);

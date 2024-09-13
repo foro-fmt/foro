@@ -37,25 +37,13 @@ pub enum DaemonResponse {
 }
 
 pub struct DaemonSocketPath {
-    #[cfg(unix)]
     pub socket_path: PathBuf,
-    #[cfg(not(unix))]
-    pub filemq_space_dir: PathBuf,
 }
 
 impl DaemonSocketPath {
     pub fn from_socket_dir(socket_dir: impl AsRef<Path>) -> Self {
-        #[cfg(unix)]
-        {
-            Self {
-                socket_path: socket_dir.as_ref().join("daemon-cmd.sock"),
-            }
-        }
-        #[cfg(not(unix))]
-        {
-            Self {
-                filemq_space_dir: socket_dir.as_ref().join("daemon-space"),
-            }
+        Self {
+            socket_path: socket_dir.as_ref().join("daemon-cmd.sock"),
         }
     }
 }

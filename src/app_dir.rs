@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::cell::LazyCell;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, OnceLock};
+use log::trace;
 
 pub(crate) fn config_file() -> Option<PathBuf> {
     let mut a = dirs::config_dir()?;

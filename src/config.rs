@@ -2,7 +2,7 @@ use crate::app_dir::{cache_dir, cache_dir_res, config_file, socket_dir_res};
 use crate::cli::GlobalOptions;
 use anyhow::{anyhow, Context, Result};
 use clap::builder::Str;
-use log::{debug, info};
+use log::{debug, info, trace};
 use serde::de::{Error, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -181,7 +181,7 @@ pub(crate) fn load_config_and_socket(
     let config_file = given_config_file
         .clone()
         .or_else(get_or_create_default_config)
-        .context("Could not get config directory")?;
+        .context("Failed to get config directory")?;
 
     let config = load_file(&config_file)
         .context(format!("Failed to load config file ({:?})", &config_file).to_string())?;
@@ -189,7 +189,8 @@ pub(crate) fn load_config_and_socket(
     let socket_dir = given_socket_dir
         .clone()
         .or(config.socket_dir.clone())
-        .unwrap_or(socket_dir_res()?);
+        .or_else(|| socket_dir_res().ok())
+        .context("Failed to get socket directory")?;
 
     debug!("config file: {:?}", &config_file);
     debug!("config: {:?}", &config);

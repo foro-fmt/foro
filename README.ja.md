@@ -32,3 +32,15 @@ foro format ./main.tsx
 # daemon を使わずフォーマット (詳細は後述)
 foro format --no-daemon ./main.tsx
 ```
+
+## 対応 OS
+実装上は unix 系、Windows (10以上) の双方に対応しています。
+
+動作確認は ubuntu, Windows 上で行っています。mac でも動作するはずです。
+
+### Windows 上での注意
+
+- Windows では OS の仕様上 unix ほどフォーマットの速度が出ません。それでも Windows 上で普通にコマンドを実行するよりは高速ですが、WSL などから実行することをおすすめします。
+  - ちなみに、Windows 上で foro を実行する場合、`--config-path` や `--socket-dir` を引数で明示してやると 2ms 程度高速になります。
+- Windows 上でのプロセス間通信に Unix Domain Socket を使用しているため、対応している Windows 10 以上の最近のバージョンである必要があります。
+  - 現在サポートされている Windows のバージョンなら大丈夫なはずです
