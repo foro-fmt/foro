@@ -7,6 +7,7 @@ use anyhow::{Context, Error, Result};
 use clap::builder::{IntoResettable, Resettable, ValueHint};
 use clap::Parser;
 use log::{debug, info};
+#[cfg(unix)]
 use nix::unistd::{fork, ForkResult};
 use os_pipe::PipeWriter;
 use serde_json::json;

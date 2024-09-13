@@ -833,6 +833,7 @@ dependencies = [
  "urlencoding",
  "wasmtime",
  "wasmtime-wasi",
+ "winsplit",
 ]
 
 [[package]]
@@ -3259,6 +3260,12 @@ checksum = "68a9bda4691f099d435ad181000724da8e5899daa10713c2d432552b9ccd3a6f"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "winsplit"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ab703352da6a72f35c39a533526393725640575bb211f61987a2748323ad956"
 
 [[package]]
 name = "winx"

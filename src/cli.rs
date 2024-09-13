@@ -19,7 +19,6 @@ use format::*;
 use crate::cli::cache::{cache_execute_with_args, CacheArgs};
 use crate::cli::daemon::{daemon_execute_with_args, DaemonArgs};
 use log::{debug, info, logger, trace, warn};
-use nix::libc::write;
 use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug)]

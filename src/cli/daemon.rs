@@ -9,22 +9,20 @@ use crate::cli::GlobalOptions;
 use crate::config::{load_config_and_cache, load_config_and_socket};
 use crate::daemon::client::{ping, run_command};
 use crate::daemon::interface::{DaemonCommands, DaemonSocketPath};
-use crate::daemon::server::{start_daemon, WrappedUnixSocket};
 use crate::handle_plugin::run::run;
 use crate::main;
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use log::{debug, error, info};
-use nix::unistd::{fork, ForkResult};
 use os_pipe::PipeWriter;
 use serde_json::json;
 use std::io::prelude::*;
 use std::io::ErrorKind;
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io, process, time};
+use crate::daemon::server::start_daemon;
 
 #[derive(Parser, Debug)]
 pub struct DaemonStartArgs {

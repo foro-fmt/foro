@@ -50,6 +50,7 @@ fn init_instance(
 
     let mut config = Config::default();
     // https://github.com/bytecodealliance/wasmtime/issues/8897
+    #[cfg(unix)]
     config.native_unwind_info(false);
     let engine = Engine::new(&config)?;
 
@@ -284,8 +285,24 @@ pub fn run(
             let rendered_cmd = env.render_str(cmd, &cur_json)?;
 
             let output = if cfg!(target_os = "windows") {
-                // memo: we can use https://github.com/chipsenkbeil/winsplit-rs
-                todo!("Windows is not supported yet")
+                let words = winsplit::split(&rendered_cmd);
+                let (exec, args) = words.split_first().context("Empty command")?;
+                let current_dir = String::get_value(&cur_json, ["current-dir"])?;
+
+                debug!(
+                    "exec: {:?}, args: {:?}, current_dir: {:?}",
+                    exec, args, current_dir
+                );
+
+                let mut output = std::process::Command::new(exec)
+                    .args(args)
+                    .current_dir(current_dir)
+                    .spawn()
+                    .context("Failed to execute command")?;
+
+                output.wait()?;
+
+                trace!("output: {:?}", output);
             } else {
                 let words = shell_words::split(&rendered_cmd)?;
                 let (exec, args) = words.split_first().context("Empty command")?;

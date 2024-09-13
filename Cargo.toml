@@ -36,3 +36,4 @@ os_pipe = "1.2.1"
 notify = "6.1.1"
 libloading = "0.8.5"
 filemq = { git = "https://github.com/nahco314/filemq", version = "0.1.0" }
+winsplit = "0.1.0"

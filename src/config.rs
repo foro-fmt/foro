@@ -113,7 +113,7 @@ pub fn load_file(path: &PathBuf) -> Result<Config> {
 }
 
 pub(crate) fn get_or_create_default_config() -> Option<PathBuf> {
-    let mut config_path = config_file()?.canonicalize().ok()?;
+    let mut config_path = config_file()?;
 
     if !config_path.exists() {
         debug!("try create default config file: {:?}", config_path);
