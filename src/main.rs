@@ -18,22 +18,6 @@ use anyhow::Result;
 fn main() -> Result<()> {
     // env::set_var("LD_LIBRARY_PATH", "/home/nahco314/.rustup/toolchains/nightly-2024-08-17-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/lib:");
 
-    eprintln!(
-        "{:?}",
-        serde_json::to_string(&DaemonCommandPayload {
-            command: DaemonCommands::Format(DaemonFormatArgs {
-                path: PathBuf::from("./asd")
-            }),
-            current_dir: env::current_dir().unwrap(),
-            global_options: GlobalOptions {
-                config_file: None,
-                cache_dir: None,
-                socket_dir: None,
-                no_cache: false,
-            },
-        })
-    );
-
     let now = SystemTime::now();
 
     // UNIXエポックからの経過時間を取得
@@ -45,7 +29,7 @@ fn main() -> Result<()> {
 
     // マイクロ秒単位の精度を計算
     let microseconds = nanoseconds / 1_000;
-    eprintln!("{}.{:06}", seconds, microseconds);
+    // eprintln!("{}.{:06}", seconds, microseconds);
 
     let r = execute();
 
@@ -60,7 +44,7 @@ fn main() -> Result<()> {
 
     // マイクロ秒単位の精度を計算
     let microseconds = nanoseconds / 1_000;
-    eprintln!("{}.{:06}", seconds, microseconds);
+    // eprintln!("{}.{:06}", seconds, microseconds);
 
     r
 }
