@@ -136,26 +136,26 @@ pub fn run_command(
 
     match run_command_inner(command, global_options, stream, None)? {
         DaemonResponse::Format(DaemonFormatResponse::Success()) => {
-            println!("Success to format");
+            info!("Success to format");
         }
         DaemonResponse::Format(DaemonFormatResponse::Ignored()) => {
-            println!("File ignored");
+            info!("File ignored");
         }
         DaemonResponse::Format(DaemonFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
         }
         DaemonResponse::PureFormat(DaemonPureFormatResponse::Success(formatted)) => {
-            println!("Success to format");
+            info!("Success to format");
             println!("{}", formatted);
         }
         DaemonResponse::PureFormat(DaemonPureFormatResponse::Ignored()) => {
-            println!("File ignored");
+            info!("File ignored");
         }
         DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
         }
         DaemonResponse::Stop => {
-            println!("Daemon stopped");
+            info!("Daemon stopped");
         }
         DaemonResponse::Pong(info) => {
             println!("pong!");
