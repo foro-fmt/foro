@@ -1,0 +1,11 @@
+// Small
+hyperfine -N --time-unit microsecond "ruff format ./src/ruff_test/small.py"
+hyperfine -N --time-unit microsecond "foro format ./src/ruff_test/small.py"
+
+// Medium
+hyperfine -N --time-unit microsecond "ruff format ./src/ruff_test/medium.py"
+hyperfine -N --time-unit microsecond "foro format ./src/ruff_test/medium.py"
+
+// Large
+hyperfine -N --time-unit microsecond "ruff format ./src/ruff_test/large.py"
+hyperfine -N --time-unit microsecond "foro format ./src/ruff_test/large.py"

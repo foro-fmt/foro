@@ -15,26 +15,25 @@ def exists_hyperfine() -> bool:
     )
 
 
-def config_projects(foro: Path) -> list[tuple[Path, list[str]]]:
-    return [
+all_commands = [
+    (
+        "biome",
+        Path("./biome-test"),
         [
-            "biome",
-            Path("./biome-test"),
-            [
-                "npx biome format --write ./test.tsx",
-                "./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./test.tsx",
-                f"{foro} format ./test.tsx",
-            ],
+            "npx biome format --write ./src/{size}.tsx",
+            "./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/{size}.tsx",
+            "{foro} format ./src/{size}.tsx",
         ],
+    ),
+    (
+        "ruff format",
+        Path("./ruff-test"),
         [
-            "ruff format",
-            Path("./ruff-test"),
-            [
-                "ruff format ./src/ruff_test/main.py",
-                f"{foro} format ./src/ruff_test/main.py",
-            ],
+            "ruff format ./src/ruff_test/{size}.py",
+            "{foro} format ./src/ruff_test/{size}.py",
         ],
-    ]
+    ),
+]
 
 
 def main() -> None:
@@ -53,7 +52,6 @@ def main() -> None:
     args = parser.parse_args()
 
     foro = Path(getattr(args, "foro-command")).resolve()
-    projects = config_projects(foro)
 
     if not exists_hyperfine():
         print(
@@ -65,20 +63,23 @@ def main() -> None:
 
     print("Running benchmarks...", flush=True)
 
-    for name, project, commands in projects:
-        print(f"\n\n\nRunning benchmark for {name}...\n", flush=True)
+    for name, project, commands in all_commands:
+        for size in ("small", "medium", "large"):
+            print(f"\n\n\nRunning benchmark for {name} + {size}...\n", flush=True)
 
-        hyperfine_command = [
-            "hyperfine",
-            "-N",
-            "--time-unit",
-            "microsecond",
-            "--style",
-            "basic",
-            *commands,
-        ]
+            p_command = map(lambda x: x.format(size=size, foro=foro), commands)
 
-        res = subprocess.run(hyperfine_command, cwd=project)
+            hyperfine_command = [
+                "hyperfine",
+                "-N",
+                "--time-unit",
+                "microsecond",
+                "--style",
+                "basic",
+                *p_command,
+            ]
+
+            res = subprocess.run(hyperfine_command, cwd=project)
 
 
 if __name__ == "__main__":

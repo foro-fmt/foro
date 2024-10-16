@@ -2,39 +2,111 @@ Running benchmarks...
 
 
 
-Running benchmark for biome...
+Running benchmark for biome + small...
 
-Benchmark 1: npx biome format --write ./test.tsx
-  Time (mean ± σ):     310686.1 µs ± 6468.0 µs    [User: 282145.2 µs, System: 60353.1 µs]
-  Range (min … max):   302302.6 µs … 320297.7 µs    10 runs
+Benchmark 1: npx biome format --write ./src/small.tsx
+  Time (mean ± σ):     315037.2 µs ± 8909.6 µs    [User: 295145.4 µs, System: 53092.3 µs]
+  Range (min … max):   302722.4 µs … 335752.2 µs    10 runs
  
-Benchmark 2: ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./test.tsx
-  Time (mean ± σ):     5442.0 µs ± 229.7 µs    [User: 1909.4 µs, System: 5288.0 µs]
-  Range (min … max):   4846.3 µs … 6494.5 µs    461 runs
+Benchmark 2: ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/small.tsx
+  Time (mean ± σ):     5473.5 µs ± 352.8 µs    [User: 2359.3 µs, System: 4854.9 µs]
+  Range (min … max):   4930.0 µs … 10489.6 µs    521 runs
  
-Benchmark 3: /home/nahco314/RustroverProjects/foro/target/release/foro format ./test.tsx
-  Time (mean ± σ):     2190.5 µs ± 245.5 µs    [User: 1061.6 µs, System: 413.3 µs]
-  Range (min … max):   1939.0 µs … 8669.5 µs    1088 runs
- 
-Summary
-  /home/nahco314/RustroverProjects/foro/target/release/foro format ./test.tsx ran
-    2.48 ± 0.30 times faster than ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./test.tsx
-  141.83 ± 16.17 times faster than npx biome format --write ./test.tsx
-CompletedProcess(args=['hyperfine', '-N', '--time-unit', 'microsecond', '--style', 'basic', 'npx biome format --write ./test.tsx', './node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./test.tsx', '/home/nahco314/RustroverProjects/foro/target/release/foro format ./test.tsx'], returncode=0)
-
-
-
-Running benchmark for ruff format...
-
-Benchmark 1: ruff format ./src/ruff_test/main.py
-  Time (mean ± σ):     7588.1 µs ± 320.4 µs    [User: 3211.4 µs, System: 10466.9 µs]
-  Range (min … max):   6969.5 µs … 9034.9 µs    364 runs
- 
-Benchmark 2: /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/main.py
-  Time (mean ± σ):     2187.0 µs ± 228.5 µs    [User: 1040.3 µs, System: 443.6 µs]
-  Range (min … max):   1941.6 µs … 8680.7 µs    1078 runs
+Benchmark 3: /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/small.tsx
+  Time (mean ± σ):     2156.8 µs ± 234.7 µs    [User: 1047.1 µs, System: 435.2 µs]
+  Range (min … max):   1920.2 µs … 8679.7 µs    1051 runs
  
 Summary
-  /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/main.py ran
-    3.47 ± 0.39 times faster than ruff format ./src/ruff_test/main.py
-CompletedProcess(args=['hyperfine', '-N', '--time-unit', 'microsecond', '--style', 'basic', 'ruff format ./src/ruff_test/main.py', '/home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/main.py'], returncode=0)
+  /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/small.tsx ran
+    2.54 ± 0.32 times faster than ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/small.tsx
+  146.07 ± 16.43 times faster than npx biome format --write ./src/small.tsx
+
+
+
+Running benchmark for biome + medium...
+
+Benchmark 1: npx biome format --write ./src/medium.tsx
+  Time (mean ± σ):     312861.0 µs ± 6637.9 µs    [User: 285941.4 µs, System: 61123.9 µs]
+  Range (min … max):   297230.9 µs … 321548.7 µs    10 runs
+ 
+Benchmark 2: ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/medium.tsx
+  Time (mean ± σ):     8316.2 µs ± 319.0 µs    [User: 4636.6 µs, System: 5464.0 µs]
+  Range (min … max):   7578.7 µs … 10227.7 µs    335 runs
+ 
+Benchmark 3: /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/medium.tsx
+  Time (mean ± σ):     4005.2 µs ± 328.4 µs    [User: 1036.0 µs, System: 477.8 µs]
+  Range (min … max):   3596.3 µs … 8793.8 µs    667 runs
+ 
+Summary
+  /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/medium.tsx ran
+    2.08 ± 0.19 times faster than ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/medium.tsx
+   78.11 ± 6.62 times faster than npx biome format --write ./src/medium.tsx
+
+
+
+Running benchmark for biome + large...
+
+Benchmark 1: npx biome format --write ./src/large.tsx
+  Time (mean ± σ):     326327.4 µs ± 20000.1 µs    [User: 296481.6 µs, System: 69802.4 µs]
+  Range (min … max):   296593.0 µs … 359109.1 µs    10 runs
+ 
+Benchmark 2: ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/large.tsx
+  Time (mean ± σ):     14489.2 µs ± 737.9 µs    [User: 9162.9 µs, System: 7155.7 µs]
+  Range (min … max):   13475.5 µs … 19183.9 µs    205 runs
+ 
+Benchmark 3: /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/large.tsx
+  Time (mean ± σ):     7620.4 µs ± 437.6 µs    [User: 1134.7 µs, System: 476.2 µs]
+  Range (min … max):   7028.1 µs … 10203.5 µs    341 runs
+ 
+Summary
+  /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/large.tsx ran
+    1.90 ± 0.15 times faster than ./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/large.tsx
+   42.82 ± 3.60 times faster than npx biome format --write ./src/large.tsx
+
+
+
+Running benchmark for ruff format + small...
+
+Benchmark 1: ruff format ./src/ruff_test/small.py
+  Time (mean ± σ):     8143.7 µs ± 1061.8 µs    [User: 3345.0 µs, System: 10878.1 µs]
+  Range (min … max):   7182.9 µs … 19804.6 µs    351 runs
+ 
+Benchmark 2: /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/small.py
+  Time (mean ± σ):     2124.5 µs ± 155.9 µs    [User: 1011.4 µs, System: 458.5 µs]
+  Range (min … max):   1881.1 µs … 3880.7 µs    1211 runs
+ 
+Summary
+  /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/small.py ran
+    3.83 ± 0.57 times faster than ruff format ./src/ruff_test/small.py
+
+
+
+Running benchmark for ruff format + medium...
+
+Benchmark 1: ruff format ./src/ruff_test/medium.py
+  Time (mean ± σ):     7946.1 µs ± 532.1 µs    [User: 2993.3 µs, System: 11032.9 µs]
+  Range (min … max):   7142.2 µs … 11248.4 µs    308 runs
+ 
+Benchmark 2: /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/medium.py
+  Time (mean ± σ):     2772.2 µs ± 255.4 µs    [User: 1058.3 µs, System: 440.5 µs]
+  Range (min … max):   2459.0 µs … 8784.5 µs    975 runs
+ 
+Summary
+  /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/medium.py ran
+    2.87 ± 0.33 times faster than ruff format ./src/ruff_test/medium.py
+
+
+
+Running benchmark for ruff format + large...
+
+Benchmark 1: ruff format ./src/ruff_test/large.py
+  Time (mean ± σ):     7950.3 µs ± 492.4 µs    [User: 3116.4 µs, System: 10942.9 µs]
+  Range (min … max):   6975.8 µs … 11899.4 µs    252 runs
+ 
+Benchmark 2: /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/large.py
+  Time (mean ± σ):     4381.5 µs ± 309.6 µs    [User: 1117.4 µs, System: 374.9 µs]
+  Range (min … max):   3985.1 µs … 5669.9 µs    601 runs
+ 
+Summary
+  /home/nahco314/RustroverProjects/foro/target/release/foro format ./src/ruff_test/large.py ran
+    1.81 ± 0.17 times faster than ruff format ./src/ruff_test/large.py

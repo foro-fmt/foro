@@ -1,0 +1,14 @@
+// Small
+hyperfine -N --time-unit microsecond "npx biome format --write ./src/small.tsx"
+hyperfine -N --time-unit microsecond "./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/small.tsx"
+hyperfine -N --time-unit microsecond "foro format ./src/small.tsx"
+
+// Medium
+hyperfine -N --time-unit microsecond "npx biome format --write ./src/medium.tsx"
+hyperfine -N --time-unit microsecond "./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/medium.tsx"
+hyperfine -N --time-unit microsecond "foro format ./src/medium.tsx"
+
+// Large
+hyperfine -N --time-unit microsecond "npx biome format --write ./src/large.tsx"
+hyperfine -N --time-unit microsecond "./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/large.tsx"
+hyperfine -N --time-unit microsecond "foro format ./src/large.tsx"
