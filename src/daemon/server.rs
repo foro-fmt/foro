@@ -90,6 +90,19 @@ pub fn daemon_format_execute_with_args(
 
         println!("{:?}", res);
 
+        if let Some(status) = String::get_value_opt(&res, ["format-status"]) {
+            match status.as_str() {
+                "ignored" => {
+                    return Ok(Some(DaemonFormatResponse::Ignored()));
+                }
+                "error" => {
+                    let error = String::get_value_opt(&res, ["format-error"]).context("Failed to get format error. Did you forget to return `format-error` in your plugin?")?;
+                    return Ok(Some(DaemonFormatResponse::Error(error)));
+                }
+                _ => {}
+            }
+        }
+
         tx.send(0)?;
 
         Ok(None)
