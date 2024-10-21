@@ -32,10 +32,6 @@ pub enum PureCommand {
     CommandIO {
         io: String,
     },
-    NativeDll {
-        #[serde(rename = "__deprecation_native_dll")]
-        native_dll: String,
-    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

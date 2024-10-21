@@ -1,84 +1,25 @@
 use crate::config::{CommandWithControlFlow, PureCommand, SomeCommand, WriteCommand};
-use crate::handle_plugin::load::{load_local_module, load_url_module};
 use anyhow::{anyhow, Context, Result};
+use dll_pack::load::{NativeLibrary, WasmLibrary};
+use dll_pack::{load, run_cached_load, Library};
 use foro_plugin_utils::data_json_utils::{merge, JsonGetter};
 use log::{debug, trace};
 use minijinja;
 use serde_json::{json, Value};
 use shell_words;
-use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
-use std::ops::DerefMut;
 use std::path::PathBuf;
-use std::process::ExitStatus;
-use std::sync::{LazyLock, Mutex};
 use url::Url;
-use wasmtime::{Config, Engine, Instance, Linker, Store};
+use wasmtime::{Instance, Store};
 use wasmtime_wasi::preview1::WasiP1Ctx;
-use wasmtime_wasi::{preview1, DirPerms, FilePerms, WasiCtxBuilder};
 
-#[derive(Hash, Eq, PartialEq)]
-pub(crate) enum FileSource {
-    #[allow(unused)]
-    LocalPath(PathBuf),
-    Url(Url),
+struct PluginSetting {
+    pub source: Url,
+    pub cache: bool,
 }
 
-pub(crate) struct PluginSetting {
-    pub(crate) wasm_source: FileSource,
-    pub(crate) cache: bool,
-}
-
-static CACHE_WASM_STORE: LazyLock<Mutex<HashMap<FileSource, (Instance, Mutex<Store<WasiP1Ctx>>)>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-fn init_instance(
-    setting: &PluginSetting,
-    cache_path: &PathBuf,
-    use_cache: bool,
-) -> Result<(Instance, Store<WasiP1Ctx>)> {
-    trace!("start init instance");
-
-    let mut config = Config::default();
-    // https://github.com/bytecodealliance/wasmtime/issues/8897
-    #[cfg(unix)]
-    config.native_unwind_info(false);
-    let engine = Engine::new(&config)?;
-
-    trace!("loaded engine");
-
-    let module = match &setting.wasm_source {
-        FileSource::LocalPath(path) => load_local_module(&engine, path, cache_path, use_cache)?,
-        FileSource::Url(url) => load_url_module(&engine, url, cache_path, use_cache)?,
-    };
-
-    trace!("loaded module");
-
-    let mut linker = Linker::new(&engine);
-
-    preview1::add_to_linker_sync(&mut linker, |t| t)?;
-    let pre = linker.instantiate_pre(&module)?;
-
-    trace!("loaded linker");
-
-    let wasi_ctx = WasiCtxBuilder::new()
-        .inherit_stdio()
-        .inherit_env()
-        .preopened_dir("/", "/", DirPerms::all(), FilePerms::all())?
-        .build_p1();
-
-    trace!("loaded wasi_ctx");
-
-    let mut store = Store::new(&engine, wasi_ctx);
-    let instance = pre.instantiate(&mut store)?;
-
-    trace!("loaded instance");
-
-    Ok((instance, store))
-}
-
-pub(crate) fn run_plugin_inner(
+fn run_plugin_inner_wasm(
     instance: Instance,
     mut store: &mut Store<WasiP1Ctx>,
     cur_map: Value,
@@ -141,63 +82,23 @@ pub(crate) fn run_plugin_inner(
     Ok(output_value)
 }
 
-pub(crate) fn run_plugin(
-    setting: PluginSetting,
-    cur_json: Value,
-    cache_path: &PathBuf,
-    use_cache: bool,
-) -> Result<Value> {
-    let use_cache = use_cache && setting.cache;
-
-    if use_cache {
-        if let Some((instance, store)) = CACHE_WASM_STORE.lock().unwrap().get(&setting.wasm_source)
-        {
-            debug!("loaded from in-memory cache");
-            return run_plugin_inner(
-                instance.clone(),
-                store.lock().unwrap().deref_mut(),
-                cur_json,
-            );
-        }
-    }
-
-    let (instance, mut store) = init_instance(&setting, cache_path, use_cache)?;
-
-    if use_cache {
-        let res = run_plugin_inner(instance.clone(), &mut store, cur_json);
-
-        CACHE_WASM_STORE
-            .lock()
-            .unwrap()
-            .insert(setting.wasm_source, (instance.clone(), Mutex::new(store)));
-
-        return res;
-    }
-
-    run_plugin_inner(instance.clone(), &mut store, cur_json)
-}
-
-static CACHE_NATIVE_LIB: LazyLock<Mutex<HashMap<String, libloading::Library>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-pub(crate) unsafe fn run_plugin_native_inner(
-    func: libloading::Symbol<unsafe extern "C" fn(ptr: u64, len: u64) -> u64>,
-    cur_map: Value,
-) -> Result<Value> {
+fn run_plugin_inner_native(library: &mut Library, cur_map: Value) -> Result<Value> {
     let input_data: Vec<u8> = serde_json::to_vec(&cur_map)?;
     let input_len = input_data.len();
 
     trace!("real run started");
 
-    let result_ptr_u64 = func(input_data.as_ptr() as u64, input_len as u64);
+    let func = library.get_function::<(u64, u64), u64>("main")?;
+
+    let result_ptr_u64 = func.call(library, (input_data.as_ptr() as u64, input_len as u64));
     let result_ptr = result_ptr_u64 as *mut u8;
 
     trace!("real run ended");
 
-    let len_part = std::slice::from_raw_parts(result_ptr, 8);
+    let len_part = unsafe { std::slice::from_raw_parts(result_ptr, 8) };
     let len = u64::from_le_bytes(len_part.try_into()?) as usize;
 
-    let output_data = std::slice::from_raw_parts(result_ptr.add(8), len);
+    let output_data = unsafe { std::slice::from_raw_parts(result_ptr.add(8), len) };
     let output_value: Value = serde_json::from_slice(output_data)?;
 
     if let Some(err_s) = String::get_value_opt(&output_value, ["plugin-panic"]) {
@@ -214,43 +115,32 @@ pub(crate) unsafe fn run_plugin_native_inner(
     Ok(output_value)
 }
 
-pub(crate) fn run_plugin_native(
-    dll_path: &str,
-    cur_map: Value,
-    _cache_path: &PathBuf,
-    _use_cache: bool,
-) -> Result<Value> {
-    unsafe {
-        trace!("0");
-
-        if let Some(lib) = CACHE_NATIVE_LIB.lock().unwrap().get(&dll_path.to_string()) {
-            debug!("loaded from in-memory cache");
-
-            let func: libloading::Symbol<unsafe extern "C" fn(ptr: u64, len: u64) -> u64> =
-                lib.get(b"main")?;
-
-            return run_plugin_native_inner(func, cur_map);
+fn run_plugin_inner(library: &mut Library, cur_map: Value) -> Result<Value> {
+    match library {
+        Library::WasmLibrary(WasmLibrary { instance, store }) => {
+            run_plugin_inner_wasm(instance.clone(), store, cur_map)
         }
-
-        trace!("1");
-
-        let lib = libloading::Library::new(dll_path)?;
-        trace!("2");
-
-        let func: libloading::Symbol<unsafe extern "C" fn(ptr: u64, len: u64) -> u64> =
-            lib.get(b"main")?;
-
-        trace!("loaded function");
-
-        let res = run_plugin_native_inner(func, cur_map);
-
-        CACHE_NATIVE_LIB
-            .lock()
-            .unwrap()
-            .insert(dll_path.to_string(), lib);
-
-        res
+        Library::NativeLibrary(NativeLibrary { .. }) => run_plugin_inner_native(library, cur_map),
     }
+}
+
+pub(crate) fn run_plugin(
+    setting: PluginSetting,
+    cur_json: Value,
+    cache_path: &PathBuf,
+    use_cache: bool,
+) -> Result<Value> {
+    let use_cache = use_cache && setting.cache;
+
+    if use_cache {
+        return run_cached_load(&setting.source, cache_path, |lib| {
+            run_plugin_inner(lib, cur_json.clone())
+        });
+    }
+
+    let mut lib = load(&setting.source, cache_path)?;
+
+    run_plugin_inner(&mut lib, cur_json)
 }
 
 fn run_inner_pure_command(
@@ -262,7 +152,7 @@ fn run_inner_pure_command(
     match command {
         PureCommand::PluginUrl(url) => {
             let setting = PluginSetting {
-                wasm_source: FileSource::Url(url.clone().into_inner()),
+                source: url.clone().into_inner(),
                 cache: true,
             };
 
@@ -331,17 +221,6 @@ fn run_inner_pure_command(
                     cur_json_m.insert("format-error".to_string(), json!(buf));
                 }
             };
-
-            Ok(cur_json)
-        }
-        PureCommand::NativeDll {
-            native_dll: dll_path,
-        } => {
-            let res = run_plugin_native(dll_path, cur_json.clone(), cache_path, use_cache)?;
-
-            merge(&mut cur_json, &res);
-
-            // debug!("done native: {:?}", res);
 
             Ok(cur_json)
         }

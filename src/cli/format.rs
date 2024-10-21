@@ -17,6 +17,7 @@ use std::{fs, io};
 pub struct FormatArgs {
     /// Path to format
     pub path: PathBuf,
+    #[clap(long)]
     pub no_daemon: bool,
 }
 

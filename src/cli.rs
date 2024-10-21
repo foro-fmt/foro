@@ -69,6 +69,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
 
     env_logger::Builder::new()
         .filter_module("foro", args.verbose.log_level_filter())
+        .filter_module("dll_pack", args.verbose.log_level_filter())
         .format(move |buf, record| {
             if IS_DAEMON_PROCESS.load(Ordering::SeqCst) {
                 let now = buf.timestamp_micros();
