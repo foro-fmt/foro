@@ -51,7 +51,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    foro = Path(getattr(args, "foro-command")).resolve()
+    foro = getattr(args, "foro-command")
 
     if not exists_hyperfine():
         print(
