@@ -589,6 +589,7 @@ dependencies = [
 [[package]]
 name = "dll-pack"
 version = "0.1.0"
+source = "git+https://github.com/nahco314/dll-pack#d1caed96a92e2e694269eee35d95df8f63fb211e"
 dependencies = [
  "anyhow",
  "libloading",
