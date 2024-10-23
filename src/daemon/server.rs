@@ -266,7 +266,12 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 fn handle_client(mut stream: UnixStream, stop_sender: Sender<()>) -> Result<()> {
     let mut buf = Vec::new();
     stream.read_to_end(&mut buf)?;
+
+    trace!("{:?}", String::from_utf8_lossy(&buf));
+
+    #[cfg(target_os = "linux")]
     stream.shutdown(Shutdown::Read)?;
+
     let payload: DaemonCommandPayload = serde_json::from_slice(&buf)?;
 
     debug!("Received: {:?}", &payload);

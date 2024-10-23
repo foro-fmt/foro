@@ -29,9 +29,7 @@ impl OnRule {
 #[serde(untagged)]
 pub enum PureCommand {
     PluginUrl(url_serde::SerdeUrl),
-    CommandIO {
-        io: String,
-    },
+    CommandIO { io: String },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

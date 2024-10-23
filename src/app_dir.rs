@@ -13,10 +13,19 @@ pub(crate) fn cache_dir() -> Option<PathBuf> {
     Some(a)
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 pub(crate) fn socket_dir() -> Option<PathBuf> {
     let mut a = dirs::runtime_dir()?;
     a.push("foro");
+    Some(a)
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn socket_dir() -> Option<PathBuf> {
+    // fixme: this is not best place
+    //   /var/run/ have permission problem
+    let mut a = dirs::config_dir()?;
+    a.push("foro-socket-tmp");
     Some(a)
 }
 
