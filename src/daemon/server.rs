@@ -61,10 +61,12 @@ pub fn daemon_format_execute_with_args(
         let (config, cache_dir) =
             load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
+        // todo: why not fs::read ?
         let file = fs::File::open(&t_target_path)?;
         let mut buf_reader = io::BufReader::new(file);
         let mut content = String::new();
         buf_reader.read_to_string(&mut content)?;
+        drop(buf_reader);
 
         let rule = match config.find_matched_rule(&t_target_path, false) {
             Some(rule) => rule,
@@ -265,7 +267,7 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 
 fn read_stream_with_retry(stream: &mut UnixStream, buf: &mut Vec<u8>) -> Result<()> {
     let mut retry_cnt = 0;
-    
+
     loop {
         let res = stream.read_to_end(buf);
 
@@ -283,7 +285,7 @@ fn read_stream_with_retry(stream: &mut UnixStream, buf: &mut Vec<u8>) -> Result<
             }
         }
     }
-    
+
     trace!("read socket input with {} retry", retry_cnt);
 
     Ok(())
@@ -341,7 +343,7 @@ impl WrappedUnixSocket {
                     socket_path: path.clone(),
                     info_path: info_path.clone(),
                 };
-                
+
                 warn!("{:?}", err);
 
                 if ping(&as_daemon_path)? {
