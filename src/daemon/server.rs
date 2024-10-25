@@ -344,14 +344,18 @@ impl WrappedUnixSocket {
                     info_path: info_path.clone(),
                 };
 
-                warn!("{:?}", err);
-
                 if ping(&as_daemon_path)? {
                     return Err(anyhow!("Daemon is already running"));
                 } else {
                     info!("Removing dead socket file");
-                    fs::remove_file(&path)?;
-                    fs::remove_file(&info_path)?;
+                    let err = fs::remove_file(&path);
+                    if let Err(err) = err {
+                        warn!("Failed to remove dead socket file: {}", err);
+                    }
+                    let err = fs::remove_file(&info_path);
+                    if let Err(err) = err {
+                        warn!("Failed to remove dead info file: {}", err);
+                    }
                     UnixListener::bind(&path)?
                 }
             }
