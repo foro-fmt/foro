@@ -184,7 +184,15 @@ pub fn daemon_pure_format_execute_with_args(
     let rule = match config.find_matched_rule(&target_path, true) {
         Some(rule) => rule,
         None => {
-            let reason = "No rule matched".to_string();
+            let found_rule_non_pure = config.find_matched_rule(&target_path, false).is_none();
+
+            let reason = if !found_rule_non_pure {
+                "No rule matched"
+            } else {
+                "No rule matched (but found non-pure rule)"
+            }
+            .to_string();
+
             return Ok(DaemonPureFormatResponse::Ignored(reason));
         }
     };
