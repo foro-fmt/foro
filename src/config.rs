@@ -145,15 +145,15 @@ pub(crate) fn get_or_create_default_config() -> Option<PathBuf> {
     "rules": [
         {
             "on": [".ts", ".tsx", ".json"],
-            "cmd": "https://github.com/nahco314/foro-biome/releases/latest/download/foro_biome.wasm"
+            "cmd": "https://github.com/nahco314/foro-biome/releases/latest/download/foro-biome.dllpack"
         },
         {
             "on": ".rs",
-            "cmd": "rustfmt +nightly --unstable-features --skip-children {{ target }}"
+            "write_cmd": "rustfmt +nightly --unstable-features --skip-children {{ target }}"
         },
         {
             "on": ".py",
-            "cmd": "https://github.com/nahco314/foro-ruff/releases/latest/download/foro_ruff.wasm"
+            "cmd": "https://github.com/nahco314/foro-ruff/releases/latest/download/foro-ruff.dllpack"
         }
     ]
 }

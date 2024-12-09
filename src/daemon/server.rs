@@ -11,7 +11,7 @@ use crate::process_utils::get_start_time;
 use anyhow::Result;
 use anyhow::{anyhow, Context};
 use foro_plugin_utils::data_json_utils::JsonGetter;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use nix::unistd::{close, fork, setsid, ForkResult};
 use notify::Watcher;
 use serde_json::json;
@@ -61,10 +61,12 @@ pub fn daemon_format_execute_with_args(
         let (config, cache_dir) =
             load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
+        // todo: why not fs::read ?
         let file = fs::File::open(&t_target_path)?;
         let mut buf_reader = io::BufReader::new(file);
         let mut content = String::new();
         buf_reader.read_to_string(&mut content)?;
+        drop(buf_reader);
 
         let rule = match config.find_matched_rule(&t_target_path, false) {
             Some(rule) => rule,
@@ -269,10 +271,41 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
     }
 }
 
+fn read_stream_with_retry(stream: &mut UnixStream, buf: &mut Vec<u8>) -> Result<()> {
+    let mut retry_cnt = 0;
+
+    loop {
+        let res = stream.read_to_end(buf);
+
+        match res {
+            Ok(_) => {
+                break;
+            }
+            Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                retry_cnt += 1;
+                sleep(Duration::from_micros(10));
+                continue;
+            }
+            Err(err) => {
+                return Err(err.into());
+            }
+        }
+    }
+
+    trace!("read socket input with {} retry", retry_cnt);
+
+    Ok(())
+}
+
 fn handle_client(mut stream: UnixStream, stop_sender: Sender<()>) -> Result<()> {
     let mut buf = Vec::new();
-    stream.read_to_end(&mut buf)?;
+    read_stream_with_retry(&mut stream, &mut buf)?;
+
+    trace!("{:?}", String::from_utf8_lossy(&buf));
+
+    #[cfg(target_os = "linux")]
     stream.shutdown(Shutdown::Read)?;
+
     let payload: DaemonCommandPayload = serde_json::from_slice(&buf)?;
 
     debug!("Received: {:?}", &payload);
@@ -316,6 +349,8 @@ impl WrappedUnixSocket {
                     socket_path: path.clone(),
                     info_path: info_path.clone(),
                 };
+
+                warn!("{:?}", err);
 
                 if ping(&as_daemon_path)? {
                     return Err(anyhow!("Daemon is already running"));
