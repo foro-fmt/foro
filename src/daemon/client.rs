@@ -138,8 +138,8 @@ pub fn run_command(
         DaemonResponse::Format(DaemonFormatResponse::Success()) => {
             info!("Success to format");
         }
-        DaemonResponse::Format(DaemonFormatResponse::Ignored()) => {
-            info!("File ignored");
+        DaemonResponse::Format(DaemonFormatResponse::Ignored(reason)) => {
+            info!("File ignored. reason: {}", reason);
         }
         DaemonResponse::Format(DaemonFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
@@ -148,8 +148,8 @@ pub fn run_command(
             info!("Success to format");
             println!("{}", formatted);
         }
-        DaemonResponse::PureFormat(DaemonPureFormatResponse::Ignored()) => {
-            info!("File ignored");
+        DaemonResponse::PureFormat(DaemonPureFormatResponse::Ignored(reason)) => {
+            info!("File ignored. reason: {}", reason);
         }
         DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(err)) => {
             return Err(anyhow!(err));

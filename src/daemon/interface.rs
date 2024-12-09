@@ -35,14 +35,14 @@ pub struct DaemonCommandPayload {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonFormatResponse {
     Success(),
-    Ignored(),
+    Ignored(String), // Ignored with reason
     Error(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonPureFormatResponse {
     Success(String),
-    Ignored(),
+    Ignored(String), // Ignored with reason
     Error(String),
 }
 
