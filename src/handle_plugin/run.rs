@@ -5,7 +5,7 @@ use dll_pack::{load, run_cached_load, Library};
 use foro_plugin_utils::data_json_utils::{merge, JsonGetter};
 use log::{debug, trace};
 use minijinja;
-use serde_json::{json, Value};
+use serde_json::{json, to_value, Value};
 use shell_words;
 use std::fs;
 use std::io::{Read, Write};
@@ -124,7 +124,7 @@ fn run_plugin_inner(library: &mut Library, cur_map: Value) -> Result<Value> {
     }
 }
 
-pub(crate) fn run_plugin(
+fn run_plugin(
     setting: PluginSetting,
     cur_json: Value,
     cache_path: &PathBuf,
@@ -321,6 +321,24 @@ fn run_flow<T>(
 
             trace!("seq done");
 
+            Ok(cur_json)
+        }
+        CommandWithControlFlow::Set { set } => {
+            trace!("set");
+
+            let env = minijinja::Environment::new();
+
+            for (key, value) in set {
+                let value_expr = env.compile_expression(value)?;
+                let value_res = value_expr.eval(&cur_json)?;
+
+                trace!("set key: {:?}, value: {:?}", key, value_res);
+
+                cur_json[key] = to_value(value_res)?;
+            }
+            
+            trace!("set done");
+            
             Ok(cur_json)
         }
         CommandWithControlFlow::Command(cmd) => {

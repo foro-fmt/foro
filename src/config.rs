@@ -2,6 +2,7 @@ use crate::app_dir::{cache_dir_res, config_file, socket_dir_res};
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
@@ -29,9 +30,7 @@ impl OnRule {
 #[serde(untagged)]
 pub enum PureCommand {
     PluginUrl(url_serde::SerdeUrl),
-    CommandIO {
-        io: String,
-    },
+    CommandIO { io: String },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -51,6 +50,9 @@ pub enum CommandWithControlFlow<T> {
         on_false: Box<CommandWithControlFlow<T>>,
     },
     Sequential(Vec<CommandWithControlFlow<T>>),
+    Set {
+        set: HashMap<String, String>,
+    },
     Command(T),
 }
 
