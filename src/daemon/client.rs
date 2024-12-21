@@ -27,9 +27,21 @@ fn parse_info(info_str: &str) -> Option<(u32, u64)> {
     Some((pid, start_time))
 }
 
+/// Check if the daemon is alive.
+///
+/// It works as follows:
+/// 1. Reads the daemon's pid and start time from the daemon's information file
+///    (which is located in the same position as the socket, etc.)
+/// 2. Asks the OS for information about the process with that pid
+/// 3. Checks that the process is currently alive and that the start time matches
+///    (because after a process has ended, another process with the same pid may start)
+///
+/// This is similar to [ping], but this function only determines whether the process is alive,
+/// whereas ping actually communicates and makes a determination.
+/// In other words, ping is more accurate but also slower.
 pub fn daemon_is_alive(socket: &DaemonSocketPath) -> Result<bool> {
-    // don't call path.exits()
-    // because we can reduce the number of system calls and speed up (a little bit!)
+    // note: don't call path.exits()
+    //       because we can reduce the number of system calls and speed up (a little bit!)
     let content = match std::fs::read_to_string(&socket.info_path) {
         Ok(content) => content,
         Err(err) if err.kind() == ErrorKind::NotFound => return Ok(false),
@@ -48,6 +60,9 @@ pub fn daemon_is_alive(socket: &DaemonSocketPath) -> Result<bool> {
     Ok(true)
 }
 
+/// Send a ping to the daemon.
+///
+/// See also [daemon_is_alive].
 pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
     match UnixStream::connect(&socket.socket_path) {
         Ok(stream) => {
@@ -111,6 +126,10 @@ fn run_command_inner(
     Ok(res)
 }
 
+/// Run a command with the daemon.
+///
+/// This function sends a command to the daemon which is running on the given socket,
+/// and outputs the result.
 pub fn run_command(
     command: DaemonCommands,
     global_options: GlobalOptions,

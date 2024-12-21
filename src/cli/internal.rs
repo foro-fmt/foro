@@ -66,6 +66,9 @@ pub struct InternalArgs {
     pub subcommand: InternalSubCommands,
 }
 
+/// A subcommand used internally by the editor plugin, etc.
+///
+/// It can be used as `foro internal`, but it will not be displayed in the help.
 pub fn internal_execute_with_args(args: InternalArgs, global_options: GlobalOptions) -> Result<()> {
     match args.subcommand {
         InternalSubCommands::Info(s_args) => {

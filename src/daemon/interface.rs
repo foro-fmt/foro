@@ -59,6 +59,10 @@ pub struct DaemonSocketPath {
     pub info_path: PathBuf,
 }
 
+/// The path to the socket and info file for the daemon.
+///
+/// The socket file is used to communicate with the daemon.
+/// The info file is used to store the daemon's pid, start time, and log file paths.
 impl DaemonSocketPath {
     pub fn from_socket_dir(socket_dir: &PathBuf) -> Self {
         Self {
@@ -83,6 +87,11 @@ impl fmt::Display for OutputPath {
     }
 }
 
+/// Information about the daemon process.
+///
+/// It includes the daemon's pid, start time, and log file paths.
+///
+/// It's used to display the daemon's status on `foro daemon ping`.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DaemonInfo {
     pub pid: u32,

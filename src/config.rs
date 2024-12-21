@@ -124,6 +124,7 @@ pub fn load_str(json: &str) -> Result<Config> {
 }
 
 pub fn load_file(path: &PathBuf) -> Result<Config> {
+    // memo: in my measurement, this implementation is faster than serde_json::from_reader, etc
     let mut file = fs::File::open(path).context("Failed to open file")?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;

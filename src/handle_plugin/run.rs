@@ -30,12 +30,16 @@ fn run_plugin_inner_wasm(
 
     trace!("loaded memory");
 
-    let func = instance.get_typed_func::<(u64, u64), u64>(&mut store, "foro_main")?;
+    // to handle memory within wasm, we will use `foro_malloc` and `foro_free` as malloc/free,
+    // which are exported from the wasm binary
     let malloc = instance.get_typed_func::<(u64, u64), u64>(&mut store, "foro_malloc")?;
     let free = instance.get_typed_func::<(u64, u64, u64), ()>(&mut store, "foro_free")?;
 
+    let func = instance.get_typed_func::<(u64, u64), u64>(&mut store, "foro_main")?;
+
     trace!("loaded functions");
 
+    // the input json is written to memory on wasm, and the pointer is obtained
     let input_data: Vec<u8> = serde_json::to_vec(&cur_map)?;
     let input_len = input_data.len() as u64;
 
@@ -46,6 +50,15 @@ fn run_plugin_inner_wasm(
     trace!("loaded input data");
 
     trace!("real start run");
+
+    // The pointer to the input json and its length are given to `foro_main`.
+    // The plugin has the length information, so it can easily read the contents of the pointer.
+    //
+    // However, due to the restrictions of the wasm abi,`foro_main` only returns a single integer value.
+    //
+    // Therefore, it creates the output in the format “the length of the output json is placed
+    // in the first 8 bytes (in little endian) and the output json is placed after that”,
+    // and returns the pointer to it.
 
     let result_ptr = func.call(&mut store, (data_ptr, input_len))?;
 
@@ -89,6 +102,11 @@ fn run_plugin_inner_native(library: &mut Library, cur_map: Value) -> Result<Valu
     trace!("real run started");
 
     let func = library.get_function::<(u64, u64), u64>("foro_main")?;
+
+    // In order to provide the same interface as the wasm plugin,
+    // there are the same restrictions on the `foro_main` abi as the wasm plugin.
+    //
+    // For details, please check the comments in [run_plugin_inner_wasm].
 
     let result_ptr_u64 = func.call(library, (input_data.as_ptr() as u64, input_len as u64));
     let result_ptr = result_ptr_u64 as *mut u8;
@@ -276,6 +294,16 @@ fn run_inner_write_command(
     }
 }
 
+/// Execute the pure command or write command CommandWithControlFlow.
+///
+/// There are two types of commands in foro:
+/// - pure commands, which return the code received as a string without actually writing it to a file.
+/// - write commands, which write directly to a file at runtime.
+///
+/// Although write commands can contain pure commands, the reverse is not possible,
+/// and since the two share most of the control flow, etc.,
+/// the implementation is a little abstract and difficult to understand,
+/// via [run_flow], [CommandWithControlFlow] etc.
 fn run_flow<T>(
     command_with_control_flow: &CommandWithControlFlow<T>,
     run_inner: fn(&T, Value, &PathBuf, bool) -> Result<Value>,
@@ -336,9 +364,9 @@ fn run_flow<T>(
 
                 cur_json[key] = to_value(value_res)?;
             }
-            
+
             trace!("set done");
-            
+
             Ok(cur_json)
         }
         CommandWithControlFlow::Command(cmd) => {

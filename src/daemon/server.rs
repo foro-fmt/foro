@@ -39,11 +39,6 @@ pub fn daemon_format_execute_with_args(
     current_dir: PathBuf,
     global_options: GlobalOptions,
 ) -> Result<DaemonFormatResponse> {
-    let no_quick_trick =
-        std::env::var_os("FORO_NO_QUICK_TRICK").is_some_and(|s| s != "0" && s != "");
-
-    trace!("no_quick_trick: {}", no_quick_trick);
-
     let target_path = current_dir.join(&args.path).canonicalize()?;
     let target_path_outer = target_path.clone();
 
@@ -51,6 +46,14 @@ pub fn daemon_format_execute_with_args(
 
     let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(|| Instant::now()));
     let t_target_path = target_path.clone();
+
+    // Even if formatting command has finished (i.e., writing to the file has completed),
+    // there is still some delay before the function call returns due to memory cleanup and
+    // other processes. Therefore, we run it in a separate thread, monitor the file for changes,
+    // and have the main thread return the result immediately once a change is detected (or once
+    // the thread execution is complete).
+    //
+    // We refer to this here as a “quick trick”.
 
     // todo: maybe to implement `?` operator to DaemonFormatResponse is better
     let t = thread::spawn(move || -> Result<Option<DaemonFormatResponse>> {
@@ -280,6 +283,10 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 }
 
 fn read_stream_with_retry(stream: &mut UnixStream, buf: &mut Vec<u8>) -> Result<()> {
+    // There is a slight time lag between when the UnixStream receives communication and when
+    // all the input data is written to the stream, so if it fails, we retry after a short delay.
+    // retry_cnt is recorded and logged for debugging purposes only.
+
     let mut retry_cnt = 0;
 
     loop {
@@ -399,6 +406,7 @@ impl Drop for WrappedUnixSocket {
     }
 }
 
+/// Core function of the daemon.
 pub fn daemon_main(socket: WrappedUnixSocket) {
     info!("Daemon started");
 
@@ -433,6 +441,10 @@ pub fn daemon_main(socket: WrappedUnixSocket) {
     info!("Daemon exited");
 }
 
+/// Start the daemon.
+///
+/// If `attach` is true, the daemon will run in the current process.
+/// If `attach` is false, the daemon will run in a separate process.
 pub fn start_daemon(socket: &DaemonSocketPath, attach: bool) -> Result<()> {
     info!("Starting daemon (attach: {})", attach);
 
