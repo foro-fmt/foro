@@ -212,7 +212,7 @@ pub fn daemon_pure_format_execute_with_args(
     let res = run_pure(
         &pure_cmt,
         json!({
-            "current-dir": current_dir.canonicalize()?.to_str().unwrap(),
+            "current-dir": target_path.parent().unwrap().to_str().unwrap(),
             "target": &target_path.to_str().unwrap(),
             "raw-target": args.path,
             "target-content": args.content,
