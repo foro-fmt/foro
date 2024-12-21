@@ -71,7 +71,8 @@ pub fn daemon_format_execute_with_args(
         let rule = match config.find_matched_rule(&t_target_path, false) {
             Some(rule) => rule,
             None => {
-                return Ok(Some(DaemonFormatResponse::Ignored()));
+                let reason = "No rule matched".to_string();
+                return Ok(Some(DaemonFormatResponse::Ignored(reason)));
             }
         };
 
@@ -95,7 +96,9 @@ pub fn daemon_format_execute_with_args(
         if let Some(status) = String::get_value_opt(&res, ["format-status"]) {
             match status.as_str() {
                 "ignored" => {
-                    return Ok(Some(DaemonFormatResponse::Ignored()));
+                    let reason = String::get_value_opt(&res, ["ignored-reason"])
+                        .unwrap_or("File ignored".to_string());
+                    return Ok(Some(DaemonFormatResponse::Ignored(reason)));
                 }
                 "error" => {
                     let error = String::get_value_opt(&res, ["format-error"]).context("Failed to get format error. Did you forget to return `format-error` in your plugin?")?;
@@ -181,7 +184,16 @@ pub fn daemon_pure_format_execute_with_args(
     let rule = match config.find_matched_rule(&target_path, true) {
         Some(rule) => rule,
         None => {
-            return Ok(DaemonPureFormatResponse::Ignored());
+            let found_rule_non_pure = config.find_matched_rule(&target_path, false).is_none();
+
+            let reason = if !found_rule_non_pure {
+                "No rule matched"
+            } else {
+                "No rule matched (but found non-pure rule)"
+            }
+            .to_string();
+
+            return Ok(DaemonPureFormatResponse::Ignored(reason));
         }
     };
 
@@ -217,7 +229,9 @@ pub fn daemon_pure_format_execute_with_args(
                 return Ok(DaemonPureFormatResponse::Success(formatted));
             }
             "ignored" => {
-                return Ok(DaemonPureFormatResponse::Ignored());
+                let reason = String::get_value_opt(&res, ["ignored-reason"])
+                    .unwrap_or("File ignored".to_string());
+                return Ok(DaemonPureFormatResponse::Ignored(reason));
             }
             "error" => {
                 let error = String::get_value_opt(&res, ["format-error"]).context("Failed to get format error. Did you forget to return `format-error` in your plugin?")?;
