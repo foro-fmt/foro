@@ -28,7 +28,7 @@ wasmtime = { version = "24.0.0", default-features = false, features = ["runtime"
 wasmtime-wasi = "24.0.0"
 minijinja = "2.2.0"
 dialoguer = "0.11.0"
-foro-plugin-utils = { git = "https://github.com/nahco314/foro-plugin-utils", version = "0.1.0" }
+foro-plugin-utils = { git = "https://github.com/nahco314/foro-plugin-utils", version = "0.2.0" }
 os_pipe = "1.2.1"
 notify = "6.1.1"
 libloading = "0.8.5"

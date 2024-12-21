@@ -30,9 +30,9 @@ fn run_plugin_inner_wasm(
 
     trace!("loaded memory");
 
-    let func = instance.get_typed_func::<(u64, u64), u64>(&mut store, "main")?;
-    let malloc = instance.get_typed_func::<(u64, u64), u64>(&mut store, "of_malloc")?;
-    let free = instance.get_typed_func::<(u64, u64, u64), ()>(&mut store, "of_free")?;
+    let func = instance.get_typed_func::<(u64, u64), u64>(&mut store, "foro_main")?;
+    let malloc = instance.get_typed_func::<(u64, u64), u64>(&mut store, "foro_malloc")?;
+    let free = instance.get_typed_func::<(u64, u64, u64), ()>(&mut store, "foro_free")?;
 
     trace!("loaded functions");
 
@@ -88,7 +88,7 @@ fn run_plugin_inner_native(library: &mut Library, cur_map: Value) -> Result<Valu
 
     trace!("real run started");
 
-    let func = library.get_function::<(u64, u64), u64>("main")?;
+    let func = library.get_function::<(u64, u64), u64>("foro_main")?;
 
     let result_ptr_u64 = func.call(library, (input_data.as_ptr() as u64, input_len as u64));
     let result_ptr = result_ptr_u64 as *mut u8;
