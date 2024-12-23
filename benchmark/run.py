@@ -33,6 +33,14 @@ all_commands = [
             "{foro} format ./src/ruff_test/{size}.py",
         ],
     ),
+    (
+        "clang-format",
+        Path("./clang-format-test"),
+        [
+            "clang-format ./{size}.cpp",
+            "{foro} format ./{size}.cpp",
+        ],
+    ),
 ]
 
 
@@ -45,7 +53,7 @@ def main() -> None:
     parser.add_argument(
         "foro-command",
         nargs="?",
-        default="../target/release/foro",
+        default="foro",
         help="The command to run foro.",
     )
 
@@ -64,7 +72,7 @@ def main() -> None:
     print("Running benchmarks...", flush=True)
 
     for name, project, commands in all_commands:
-        for size in ("small", "medium", "large"):
+        for size in ("small", "large"):
             print(f"\n\n\nRunning benchmark for {name} + {size}...\n", flush=True)
 
             p_command = map(lambda x: x.format(size=size, foro=foro), commands)

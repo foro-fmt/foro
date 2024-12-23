@@ -1,67 +1,39 @@
 {
-   "$schema": "https://biomejs.dev/schemas/1.8.3/schema.json",
-   "linter": {
-      "enabled": true,
-      "rules": {
-         "all": true,
-         "correctness": {
+    "$schema": "https://biomejs.dev/schemas/1.8.3/schema.json",
+    "linter": {
+        "enabled": true,
+        "rules": {
             "all": true,
-            "noUndeclaredVariables": "off"
-         },
-         "style": {
-            "all": true,
-            "noParameterProperties": "off",
-            "useImportType": "off"
-         },
-         "nursery": {}
-      }
-   },
-   "formatter": {
-      "enabled": true,
-      "indentStyle": "space",
-      "lineWidth": 80,
-      "indentWidth": 4
-   },
-   "javascript": {
-      "formatter": {
-         "quoteStyle": "single",
-         "quoteProperties": "asNeeded",
-         "trailingCommas": "none",
-         "semicolons": "asNeeded"
-      },
-      "parser": {
-         "unsafeParameterDecoratorsEnabled": true
-      }
-   },
-   "organizeImports": {
-      "enabled": true
-   },
-   "files": {
-      "ignoreUnknown": true
-   },
-   "overrides": [
-      {
-         "include": ["functions/**", "terraform/**"],
-         "linter": {
-            "rules": {
-               "correctness": {
-                  "noNodejsModules": "off"
-               },
-               "style": {
-                  "noNamespaceImport": "off"
-               }
-            }
-         }
-      },
-      {
-         "include": ["storefront/**", "appfront/**"],
-         "linter": {
-            "rules": {
-               "performance": {
-                  "noBarrelFile": "off"
-               }
-            }
-         }
-      }
-   ]
+            "correctness": {
+                "all": true,
+                "noUndeclaredVariables": "off"
+            },
+            "style": {
+                "all": true,
+                "noParameterProperties": "off",
+                "useImportType": "off"
+            },
+            "nursery": {}
+        }
+    },
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "space",
+        "lineWidth": 80,
+        "indentWidth": 4
+    },
+    "javascript": {
+        "formatter": {
+            "quoteStyle": "single",
+            "quoteProperties": "asNeeded",
+            "trailingCommas": "none",
+            "semicolons": "asNeeded"
+        },
+        "parser": {
+            "unsafeParameterDecoratorsEnabled": true
+        }
+    },
+    "organizeImports": {
+        "enabled": true
+    }
 }

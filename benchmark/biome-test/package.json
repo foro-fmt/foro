@@ -1,17 +1,17 @@
 {
-  "name": "biome-test",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@biomejs/biome": "^1.8.3"
-  },
-  "devDependencies": {
-    "prettier": "^3.3.3"
-  }
+    "name": "biome-test",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@biomejs/biome": "^1.8.3"
+    },
+    "devDependencies": {
+        "prettier": "^3.3.3"
+    }
 }
