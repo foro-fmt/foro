@@ -1,0 +1,17 @@
+.idea/
+.vscode/
+.history/
+
+build/
+dist/
+out/
+bin/
+tmp/
+.cache/
+coverage/
+.nyc_output/
+
+node_modules/
+venv/
+__pycache__/
+target/

@@ -3,6 +3,7 @@ use crate::config::{load_config_and_cache, load_config_and_socket};
 use crate::daemon::client::{daemon_is_alive, run_command as daemon_run_command};
 use crate::daemon::interface::{DaemonCommands, DaemonFormatArgs, DaemonSocketPath};
 use crate::daemon::server::start_daemon;
+use crate::debug_long;
 use crate::handle_plugin::run::run;
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -36,7 +37,7 @@ fn format_with_no_daemon(args: FormatArgs, global_options: GlobalOptions) -> Res
         .find_matched_rule(&target_path, false)
         .context("No rule matched")?;
 
-    debug!("run rule: {:?}", rule);
+    debug_long!("run rule: {:?}", rule);
 
     let res = run(
         &rule.some_cmd,
@@ -51,7 +52,7 @@ fn format_with_no_daemon(args: FormatArgs, global_options: GlobalOptions) -> Res
         !global_options.no_cache,
     )?;
 
-    debug!("{:?}", res);
+    debug_long!("{:?}", res);
     info!("Success to format");
 
     Ok(())

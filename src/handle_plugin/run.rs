@@ -1,7 +1,8 @@
 use crate::config::{CommandWithControlFlow, PureCommand, SomeCommand, WriteCommand};
+use crate::{debug_long, trace_long};
 use anyhow::{anyhow, Context, Result};
 use dll_pack::load::{NativeLibrary, WasmLibrary};
-use dll_pack::{load, run_cached_load, Library};
+use dll_pack::{load, run_multi_cached, Library};
 use foro_plugin_utils::data_json_utils::{merge, JsonGetter};
 use log::{debug, trace};
 use minijinja;
@@ -106,7 +107,7 @@ fn run_plugin_inner_native(library: &mut Library, cur_map: Value) -> Result<Valu
     // In order to provide the same interface as the wasm plugin,
     // there are the same restrictions on the `foro_main` abi as the wasm plugin.
     //
-    // For details, please check the comments in [run_plugin_inner_wasm].
+    // For details, please check the comments in `run_plugin_inner_wasm`.
 
     let result_ptr_u64 = func.call(library, (input_data.as_ptr() as u64, input_len as u64));
     let result_ptr = result_ptr_u64 as *mut u8;
@@ -151,7 +152,7 @@ fn run_plugin(
     let use_cache = use_cache && setting.cache;
 
     if use_cache {
-        return run_cached_load(&setting.source, cache_path, |lib| {
+        return run_multi_cached(&setting.source, cache_path, |lib| {
             run_plugin_inner(lib, cur_json.clone())
         });
     }
@@ -194,9 +195,11 @@ fn run_inner_pure_command(
                 let target_content = String::get_value(&cur_json, ["target-content"])?;
                 let current_dir = String::get_value(&cur_json, ["current-dir"])?;
 
-                debug!(
+                debug_long!(
                     "exec: {:?}, args: {:?}, current_dir: {:?}",
-                    exec, args, current_dir
+                    exec,
+                    args,
+                    current_dir
                 );
 
                 let mut child = std::process::Command::new(exec)
@@ -264,9 +267,11 @@ fn run_inner_write_command(
             let (exec, args) = words.split_first().context("Empty command")?;
             let current_dir = String::get_value(&cur_json, ["current-dir"])?;
 
-            debug!(
+            debug_long!(
                 "exec: {:?}, args: {:?}, current_dir: {:?}",
-                exec, args, current_dir
+                exec,
+                args,
+                current_dir
             );
 
             let mut output = std::process::Command::new(exec)
@@ -277,7 +282,7 @@ fn run_inner_write_command(
 
             output.wait()?;
 
-            trace!("output: {:?}", output);
+            trace_long!("output: {:?}", output);
 
             Ok(json!({}))
         }

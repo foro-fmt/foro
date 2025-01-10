@@ -1,14 +1,12 @@
 use crate::cli::GlobalOptions;
-use crate::config::{load_config_and_cache, load_config_and_socket, load_paths};
+use crate::config::load_paths;
 use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
-use dialoguer::Confirm;
-use log::{debug, error};
 use serde::{Deserialize, Serialize};
+use std::io;
 use std::io::prelude::*;
 use std::path::PathBuf;
-use std::{fs, io};
 
 #[derive(Parser, Debug)]
 pub struct InternalInfoArgs {}

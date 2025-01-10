@@ -18,9 +18,16 @@ pub struct DaemonPureFormatArgs {
 }
 
 #[derive(Parser, Serialize, Deserialize, Debug)]
+pub struct DaemonBulkFormatArgs {
+    /// Paths to format
+    pub paths: Vec<PathBuf>,
+}
+
+#[derive(Parser, Serialize, Deserialize, Debug)]
 pub enum DaemonCommands {
     Format(DaemonFormatArgs),
     PureFormat(DaemonPureFormatArgs),
+    BulkFormat(DaemonBulkFormatArgs),
     Stop,
     Ping,
 }
@@ -47,9 +54,16 @@ pub enum DaemonPureFormatResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum DaemonBulkFormatResponse {
+    Success(String),
+    Error(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonResponse {
     Format(DaemonFormatResponse),
     PureFormat(DaemonPureFormatResponse),
+    BulkFormat(DaemonBulkFormatResponse),
     Stop,
     Pong(DaemonInfo),
 }

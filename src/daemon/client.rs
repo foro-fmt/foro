@@ -1,7 +1,7 @@
 use crate::cli::GlobalOptions;
 use crate::daemon::interface::{
-    DaemonCommandPayload, DaemonCommands, DaemonFormatResponse, DaemonPureFormatResponse,
-    DaemonResponse, DaemonSocketPath,
+    DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands, DaemonFormatResponse,
+    DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath,
 };
 use crate::process_utils::{get_start_time, is_alive};
 use anyhow::{anyhow, Context, Result};
@@ -73,6 +73,7 @@ pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
                     cache_dir: None,
                     socket_dir: None,
                     no_cache: false,
+                    no_long_log: false,
                 },
                 stream,
                 Some(Duration::from_secs(1)),
@@ -171,6 +172,12 @@ pub fn run_command(
             info!("File ignored. reason: {}", reason);
         }
         DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(err)) => {
+            return Err(anyhow!(err));
+        }
+        DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Success(message)) => {
+            info!("Success to format: {}", message);
+        }
+        DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
         }
         DaemonResponse::Stop => {

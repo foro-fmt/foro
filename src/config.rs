@@ -1,4 +1,5 @@
 use crate::app_dir::{cache_dir_res, config_file, socket_dir_res};
+use crate::debug_long;
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -93,7 +94,7 @@ impl Rule {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub rules: Vec<Rule>,
     #[serde(default = "none")]
@@ -188,7 +189,7 @@ pub(crate) fn load_config_and_cache(
         .context("Failed to get cache directory")?;
 
     debug!("config file: {:?}", &config_file);
-    debug!("config: {:?}", &config);
+    debug_long!("config: {:?}", &config);
     debug!("cache dir: {:?}", &cache_dir);
 
     Ok((config, cache_dir))
@@ -213,7 +214,7 @@ pub(crate) fn load_config_and_socket(
         .context("Failed to get socket directory")?;
 
     debug!("config file: {:?}", &config_file);
-    debug!("config: {:?}", &config);
+    debug_long!("config: {:?}", &config);
     debug!("socket dir: {:?}", &socket_dir);
 
     Ok((config, socket_dir))

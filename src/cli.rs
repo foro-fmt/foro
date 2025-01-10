@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
+mod bulk_format;
 mod cache;
 mod daemon;
 pub mod format;
@@ -14,9 +15,11 @@ mod internal;
 
 use format::*;
 
+use crate::cli::bulk_format::{bulk_format_execute_with_args, BulkFormatArgs};
 use crate::cli::cache::{cache_execute_with_args, CacheArgs};
 use crate::cli::daemon::{daemon_execute_with_args, DaemonArgs};
 use crate::cli::internal::{internal_execute_with_args, InternalArgs};
+use crate::log::{init_env_logger, DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD, IS_DAEMON_PROCESS};
 use log::trace;
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +28,7 @@ pub enum SubCommands {
     Cache(CacheArgs),
     Daemon(DaemonArgs),
     Format(FormatArgs),
+    BulkFormat(BulkFormatArgs),
     #[clap(hide = true)]
     Internal(InternalArgs),
 }
@@ -46,6 +50,10 @@ pub struct GlobalOptions {
     /// Avoid reading from or writing to the cache
     #[arg(long, default_value = "false")]
     pub no_cache: bool,
+
+    /// Avoid logging log content
+    #[arg(long, default_value = "false")]
+    pub no_long_log: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -60,57 +68,11 @@ pub struct Command {
     pub global_options: GlobalOptions,
 }
 
-pub static IS_DAEMON_PROCESS: AtomicBool = AtomicBool::new(false);
-thread_local!(pub static DAEMON_THREAD_START: OnceCell<Instant> = OnceCell::new());
-thread_local!(pub static IS_DAEMON_MAIN_THREAD: OnceCell<bool> = OnceCell::new());
-
 pub fn execute_with_args(args: Command) -> Result<()> {
-    let start_time = Instant::now();
-
-    env_logger::Builder::new()
-        .filter_module("foro", args.verbose.log_level_filter())
-        .filter_module("dll_pack", args.verbose.log_level_filter())
-        .format(move |buf, record| {
-            if IS_DAEMON_PROCESS.load(Ordering::SeqCst) {
-                let now = buf.timestamp_micros();
-
-                let elapsed =
-                    DAEMON_THREAD_START.with(|start| start.get_or_init(Instant::now).elapsed());
-                let elapsed_micros = elapsed.as_micros();
-
-                let is_main_thread = IS_DAEMON_MAIN_THREAD
-                    .with(|is_main_thread| *is_main_thread.get_or_init(|| false));
-
-                let level = record.level();
-                let level_style = buf.default_level_style(level);
-
-                let path = record.module_path().unwrap_or("");
-
-                write!(buf, "[{now} ")?;
-                if !is_main_thread {
-                    write!(buf, "{elapsed_micros:>5} μs ")?;
-                }
-                write!(buf, "{level_style}{level:<5}{level_style:#} ")?;
-                write!(buf, "{path}] ")?;
-                write!(buf, "{body}\n", body = record.args())?;
-            } else {
-                let elapsed = start_time.elapsed();
-                let elapsed_micros = elapsed.as_micros();
-
-                let level = record.level();
-                let level_style = buf.default_level_style(level);
-
-                let path = record.module_path().unwrap_or("");
-
-                write!(buf, "[{elapsed_micros:>5} μs ")?;
-                write!(buf, "{level_style}{level:<5}{level_style:#} ")?;
-                write!(buf, "{path}] ")?;
-                write!(buf, "{body}\n", body = record.args())?;
-            }
-
-            Ok(())
-        })
-        .init();
+    init_env_logger(
+        args.verbose.log_level_filter(),
+        args.global_options.no_long_log,
+    );
 
     trace!("start foro: {:?}", &args);
 
@@ -120,6 +82,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
         SubCommands::Cache(s_args) => cache_execute_with_args(s_args, global_options),
         SubCommands::Daemon(s_args) => daemon_execute_with_args(s_args, global_options),
         SubCommands::Format(s_args) => format_execute_with_args(s_args, global_options),
+        SubCommands::BulkFormat(s_args) => bulk_format_execute_with_args(s_args, global_options),
         SubCommands::Internal(s_args) => internal_execute_with_args(s_args, global_options),
     }?;
 

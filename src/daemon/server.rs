@@ -1,12 +1,17 @@
 use crate::app_dir::log_dir_res;
-use crate::cli::{GlobalOptions, DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD, IS_DAEMON_PROCESS};
+use crate::bulk_format::{bulk_format, BulkFormatOption};
+use crate::cli::GlobalOptions;
 use crate::config::{load_config_and_cache, Rule, SomeCommand};
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
-    DaemonCommandPayload, DaemonCommands, DaemonFormatArgs, DaemonFormatResponse, DaemonInfo,
-    DaemonPureFormatArgs, DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath, OutputPath,
+    DaemonBulkFormatArgs, DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands,
+    DaemonFormatArgs, DaemonFormatResponse, DaemonInfo, DaemonPureFormatArgs,
+    DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath, OutputPath,
 };
+use crate::debug_long;
 use crate::handle_plugin::run::{run, run_pure};
+use crate::log::IS_DAEMON_PROCESS;
+use crate::log::{DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD};
 use crate::process_utils::get_start_time;
 use anyhow::Result;
 use anyhow::{anyhow, Context};
@@ -15,6 +20,7 @@ use log::{debug, error, info, trace, warn};
 use nix::unistd::{close, fork, setsid, ForkResult};
 use notify::Watcher;
 use serde_json::json;
+use std::fmt::format;
 use std::fs::{DirBuilder, OpenOptions};
 use std::io::prelude::*;
 use std::io::{ErrorKind, Read};
@@ -79,7 +85,7 @@ pub fn daemon_format_execute_with_args(
             }
         };
 
-        debug!("run rule: {:?}", rule);
+        debug_long!("run rule: {:?}", rule);
 
         let res = run(
             &rule.some_cmd,
@@ -200,9 +206,9 @@ pub fn daemon_pure_format_execute_with_args(
         }
     };
 
-    debug!("run rule: {:?}", rule);
+    debug_long!("run rule: {:?}", rule);
 
-    let pure_cmt = match rule {
+    let pure_cmd = match rule {
         Rule {
             some_cmd: SomeCommand::Pure { cmd },
             ..
@@ -213,7 +219,7 @@ pub fn daemon_pure_format_execute_with_args(
     };
 
     let res = run_pure(
-        &pure_cmt,
+        &pure_cmd,
         json!({
             "current-dir": target_path.parent().unwrap().to_str().unwrap(),
             "target": &target_path.to_str().unwrap(),
@@ -249,6 +255,39 @@ pub fn daemon_pure_format_execute_with_args(
     ))
 }
 
+pub fn daemon_bulk_format_execute_with_args(
+    args: DaemonBulkFormatArgs,
+    current_dir: PathBuf,
+    global_options: GlobalOptions,
+) -> Result<DaemonBulkFormatResponse> {
+    let paths = args
+        .paths
+        .iter()
+        .map(|p| {
+            current_dir
+                .join(p)
+                .canonicalize()
+                .map_err(anyhow::Error::from)
+        })
+        .collect::<Result<Vec<PathBuf>>>()?;
+
+    let (config, cache_dir) =
+        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+
+    let opt = BulkFormatOption {
+        paths,
+        threads: 3,
+        use_default_ignore: true,
+        current_dir,
+    };
+
+    let success_count = bulk_format(&opt, &config, &cache_dir, !global_options.no_cache);
+
+    Ok(DaemonBulkFormatResponse::Success(format!(
+        "Formated {success_count} files"
+    )))
+}
+
 pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse {
     match payload.command {
         DaemonCommands::Format(s_args) => {
@@ -260,7 +299,9 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 
             match res {
                 Ok(res) => DaemonResponse::Format(res),
-                Err(err) => DaemonResponse::Format(DaemonFormatResponse::Error(format!("{:#}", err))),
+                Err(err) => {
+                    DaemonResponse::Format(DaemonFormatResponse::Error(format!("{:#}", err)))
+                }
             }
         }
         DaemonCommands::PureFormat(s_args) => {
@@ -272,9 +313,25 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 
             match res {
                 Ok(res) => DaemonResponse::PureFormat(res),
-                Err(err) => {
-                    DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(format!("{:#}", err)))
-                }
+                Err(err) => DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(format!(
+                    "{:#}",
+                    err
+                ))),
+            }
+        }
+        DaemonCommands::BulkFormat(s_args) => {
+            let res = daemon_bulk_format_execute_with_args(
+                s_args,
+                payload.current_dir,
+                payload.global_options,
+            );
+
+            match res {
+                Ok(res) => DaemonResponse::BulkFormat(res),
+                Err(err) => DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Error(format!(
+                    "{:#}",
+                    err
+                ))),
             }
         }
         DaemonCommands::Stop => DaemonResponse::Stop,
@@ -323,11 +380,11 @@ fn handle_client(mut stream: UnixStream, stop_sender: Sender<()>) -> Result<()> 
 
     let payload: DaemonCommandPayload = serde_json::from_slice(&buf)?;
 
-    debug!("Received: {:?}", &payload);
+    debug_long!("Received: {:?}", &payload);
 
     let response = serverside_exec_command(payload);
 
-    debug!("Response: {:?}", &response);
+    debug_long!("Response: {:?}", &response);
 
     let response_string = serde_json::to_string(&response)?;
 

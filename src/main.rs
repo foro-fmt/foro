@@ -1,18 +1,18 @@
 #![feature(test)]
+#![feature(thread_id_value)]
 
-use crate::cli::{execute, GlobalOptions};
-use std::env;
-use std::path::PathBuf;
+use crate::cli::execute;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod app_dir;
+mod bulk_format;
 mod cli;
 mod config;
 mod daemon;
 mod handle_plugin;
+mod log;
 mod process_utils;
 
-use crate::daemon::interface::{DaemonCommandPayload, DaemonCommands, DaemonFormatArgs};
 use anyhow::Result;
 
 fn main() -> Result<()> {
