@@ -132,8 +132,8 @@ pub fn bulk_format(
                         running_count.fetch_add(1, Ordering::SeqCst);
 
                         let res = format_file(
-                            &path.to_path_buf(),
-                            &opt.current_dir,
+                            &path,
+                            &path.parent().unwrap().to_path_buf(),
                             &config,
                             &cache_path,
                             use_cache,
