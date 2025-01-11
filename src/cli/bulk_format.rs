@@ -10,6 +10,7 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 pub struct BulkFormatArgs {
     /// Paths to format
+    #[clap(default_value = ".")]
     pub paths: Vec<PathBuf>,
 }
 

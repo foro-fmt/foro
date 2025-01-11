@@ -281,7 +281,7 @@ pub fn daemon_bulk_format_execute_with_args(
         current_dir,
     };
 
-    let success_count = bulk_format(&opt, &config, &cache_dir, !global_options.no_cache);
+    let success_count = bulk_format(&opt, &config, &cache_dir, !global_options.no_cache)?;
 
     Ok(DaemonBulkFormatResponse::Success(format!(
         "Formated {success_count} files"

@@ -67,8 +67,8 @@ pub fn bulk_format(
     config: &Config,
     cache_path: &PathBuf,
     use_cache: bool,
-) -> usize {
-    let (fst, rest) = opt.paths.split_first().unwrap();
+) -> Result<usize> {
+    let (fst, rest) = opt.paths.split_first().context("No path given")?;
 
     let mut walk_builder = WalkBuilder::new(fst);
     for path in rest {
@@ -156,5 +156,5 @@ pub fn bulk_format(
         t.join().unwrap();
     }
 
-    success_count.load(Ordering::SeqCst)
+    Ok(success_count.load(Ordering::SeqCst))
 }
