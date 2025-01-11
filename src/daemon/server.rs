@@ -276,7 +276,7 @@ pub fn daemon_bulk_format_execute_with_args(
 
     let opt = BulkFormatOption {
         paths,
-        threads: 3,
+        threads: args.threads,
         use_default_ignore: true,
         current_dir,
     };

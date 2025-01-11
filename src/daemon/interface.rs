@@ -21,6 +21,8 @@ pub struct DaemonPureFormatArgs {
 pub struct DaemonBulkFormatArgs {
     /// Paths to format
     pub paths: Vec<PathBuf>,
+    /// Number of threads to use
+    pub threads: usize,
 }
 
 #[derive(Parser, Serialize, Deserialize, Debug)]

@@ -12,6 +12,9 @@ pub struct BulkFormatArgs {
     /// Paths to format
     #[clap(default_value = ".")]
     pub paths: Vec<PathBuf>,
+    /// Number of threads to use
+    #[clap(short, long, default_value = "0")]
+    pub threads: usize,
 }
 
 pub fn bulk_format_execute_with_args(
@@ -27,8 +30,17 @@ pub fn bulk_format_execute_with_args(
         start_daemon(&socket, false)?;
     }
 
+    let threads = if args.threads == 0 {
+        num_cpus::get()
+    } else {
+        args.threads
+    };
+
     daemon_run_command(
-        DaemonCommands::BulkFormat(DaemonBulkFormatArgs { paths: args.paths }),
+        DaemonCommands::BulkFormat(DaemonBulkFormatArgs {
+            paths: args.paths,
+            threads,
+        }),
         global_options,
         &socket,
         false,
