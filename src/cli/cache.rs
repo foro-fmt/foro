@@ -1,15 +1,19 @@
 use crate::cli::GlobalOptions;
-use crate::config::load_config_and_cache;
+use crate::config::{load_config_and_cache, load_config_and_socket};
+use crate::daemon::client::run_command;
+use crate::daemon::interface::{DaemonCommands, DaemonSocketPath};
 use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
-use dll_pack::resolve::{get_all_cached_dependencies, CachedDependencyResult};
+use dll_pack::resolve::get_all_cached_dependencies;
 use log::{debug, error, info};
 use minijinja::functions::debug;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::thread::sleep;
+use std::time::Duration;
 use url::Url;
 
 #[derive(Parser, Debug)]
@@ -71,6 +75,17 @@ pub fn cache_remove_execute_with_args(
     let (_, cache_dir) =
         load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
 
+    // In Windows, it takes a little while for the process to stop,
+    // and if you try to connect during that time, we will get an error,
+    // so sleep a little
+
+    #[cfg(windows)]
+    {
+        // todo: Even with this, errors still occur occasionally,
+        //   so we must use IPC to ensure that wait.
+        sleep(Duration::from_millis(10));
+    }
+
     if !cache_dir.exists() {
         debug!("cache directory does not exist, so we do nothing");
         return Ok(());
@@ -84,20 +99,8 @@ pub fn cache_remove_execute_with_args(
         None => {
             info!("No cache found for the URL: {:?}", url);
         }
-        Some(CachedDependencyResult {
-            manifest_path,
-            dependencies,
-        }) => {
-            info!("Removing cache for the URL: {:?}", url);
-
-            fs::remove_file(&manifest_path).context(format!(
-                "Failed to remove cache file ({:?})",
-                &manifest_path
-            ))?;
-
-            debug!("Removed cache file: {:?}", manifest_path);
-
-            for (dep_url, loc) in dependencies {
+        Some(deps) => {
+            for (dep_url, loc) in deps {
                 info!("Removing cache for the URL: {:?}", dep_url);
 
                 if loc.is_dir() {

@@ -7,7 +7,6 @@ use foro_plugin_utils::data_json_utils::{merge, JsonGetter};
 use log::{debug, trace};
 use minijinja;
 use serde_json::{json, to_value, Value};
-use shell_words;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -189,9 +188,13 @@ fn run_inner_pure_command(
                 // memo: we can use https://github.com/chipsenkbeil/winsplit-rs
                 todo!("Windows is not supported yet")
             } else {
+                #[cfg(unix)]
                 let words = shell_words::split(&rendered_cmd)?;
+                #[cfg(windows)]
+                let words = winsplit::split(&rendered_cmd);
+
                 let (exec, args) = words.split_first().context("Empty command")?;
-                let _target_path = String::get_value(&cur_json, ["target"])?;
+                let _target_path = String::get_value(&cur_json, ["os-target"])?;
                 let target_content = String::get_value(&cur_json, ["target-content"])?;
                 let current_dir = String::get_value(&cur_json, ["current-dir"])?;
 
@@ -280,6 +283,8 @@ fn run_inner_write_command(
                 .spawn()
                 .context("Failed to execute command")?;
 
+            trace!("spawned");
+
             output.wait()?;
 
             trace_long!("output: {:?}", output);
@@ -289,7 +294,7 @@ fn run_inner_write_command(
         WriteCommand::Pure(pure) => {
             let res = run_inner_pure_command(pure, cur_json.clone(), cache_path, use_cache)?;
 
-            let target_path = String::get_value(&cur_json, ["target"])?;
+            let target_path = String::get_value(&cur_json, ["os-target"])?;
             if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
                 fs::write(target_path, formatted)?;
             }
@@ -393,11 +398,11 @@ pub fn run(
     use_cache: bool,
 ) -> Result<Value> {
     debug!("run command: {:?}", some_command);
-    // debug!("data-json: {:?}", &cur_json);
+    debug_long!("data-json: {:?}", &cur_json);
 
     let res = match some_command {
         SomeCommand::Pure { cmd } => {
-            let target_path = String::get_value(&cur_json, ["target"])?;
+            let target_path = String::get_value(&cur_json, ["os-target"])?;
 
             let res = run_flow(cmd, run_inner_pure_command, cur_json, cache_path, use_cache)?;
 
@@ -421,7 +426,7 @@ pub fn run(
     };
 
     debug!("done command: {:?}", some_command);
-    // debug!("data-json: {:?}", &res);
+    debug_long!("data-json: {:?}", &res);
 
     Ok(res)
 }
@@ -433,7 +438,7 @@ pub fn run_pure(
     use_cache: bool,
 ) -> Result<Value> {
     debug!("run pure command: {:?}", command);
-    // debug!("data-json: {:?}", &cur_json);
+    debug_long!("data-json: {:?}", &cur_json);
 
     let res = run_flow(
         command,
@@ -444,7 +449,7 @@ pub fn run_pure(
     )?;
 
     debug!("done pure command: {:?}", command);
-    // debug!("data-json: {:?}", &res);
+    debug_long!("data-json: {:?}", &res);
 
     Ok(res)
 }

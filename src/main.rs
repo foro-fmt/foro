@@ -2,6 +2,7 @@
 #![feature(thread_id_value)]
 
 use crate::cli::execute;
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod app_dir;
@@ -11,6 +12,7 @@ mod config;
 mod daemon;
 mod handle_plugin;
 mod log;
+mod path_utils;
 mod process_utils;
 
 use anyhow::Result;

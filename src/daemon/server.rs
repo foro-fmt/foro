@@ -12,11 +12,13 @@ use crate::debug_long;
 use crate::handle_plugin::run::{run, run_pure};
 use crate::log::IS_DAEMON_PROCESS;
 use crate::log::{DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD};
+use crate::path_utils::normalize_path;
 use crate::process_utils::get_start_time;
 use anyhow::Result;
 use anyhow::{anyhow, Context};
 use foro_plugin_utils::data_json_utils::JsonGetter;
 use log::{debug, error, info, trace, warn};
+#[cfg(unix)]
 use nix::unistd::{close, fork, setsid, ForkResult};
 use notify::Watcher;
 use serde_json::json;
@@ -25,18 +27,23 @@ use std::fs::{DirBuilder, OpenOptions};
 use std::io::prelude::*;
 use std::io::{ErrorKind, Read};
 use std::net::Shutdown;
+#[cfg(unix)]
 use std::os::fd::IntoRawFd;
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::windows::io::{AsHandle, AsRawHandle};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, OnceLock};
 use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use std::{fs, io, process, thread};
+use std::{env, fs, io, process, thread};
 #[cfg(windows)]
 use uds_windows::{UnixListener, UnixStream};
+use winapi::um::processenv::SetStdHandle;
+use winapi::um::winbase::{STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
+use winapi::um::winnt::HANDLE;
 
 static DAEMON_INFO: OnceLock<DaemonInfo> = OnceLock::new();
 
@@ -90,17 +97,18 @@ pub fn daemon_format_execute_with_args(
         let res = run(
             &rule.some_cmd,
             json!({
-                "current-dir": current_dir.canonicalize()?.to_str().unwrap(),
-                "target": &t_target_path.to_str().unwrap(),
+                "wasm-current-dir":  normalize_path(&current_dir)?,
+                "os-current-dir": current_dir.canonicalize()?.to_str().unwrap(),
+                "wasm-target": normalize_path(&t_target_path)?,
+                "os-target": &t_target_path.to_str().unwrap(),
                 "raw-target": args.path,
                 "target-content": content,
-                }
-            ),
+            }),
             &cache_dir,
             !global_options.no_cache,
         )?;
 
-        println!("{:?}", res);
+        debug_long!("{:?}", res);
 
         if let Some(status) = String::get_value_opt(&res, ["format-status"]) {
             match status.as_str() {
@@ -221,12 +229,13 @@ pub fn daemon_pure_format_execute_with_args(
     let res = run_pure(
         &pure_cmd,
         json!({
-            "current-dir": target_path.parent().unwrap().to_str().unwrap(),
-            "target": &target_path.to_str().unwrap(),
+            "wasm-current-dir":  normalize_path(&current_dir)?,
+            "os-current-dir": current_dir.canonicalize()?.to_str().unwrap(),
+            "wasm-target": normalize_path(&target_path)?,
+            "os-target": &target_path.to_str().unwrap(),
             "raw-target": args.path,
             "target-content": args.content,
-            }
-        ),
+        }),
         &cache_dir,
         !global_options.no_cache,
     )?;
@@ -469,7 +478,7 @@ impl Drop for WrappedUnixSocket {
 
 /// Core function of the daemon.
 pub fn daemon_main(socket: WrappedUnixSocket) {
-    info!("Daemon started");
+    info!("Daemon process started");
 
     let (tx, rx) = mpsc::channel();
 
@@ -598,7 +607,84 @@ pub fn start_daemon(socket: &DaemonSocketPath, attach: bool) -> Result<()> {
                 }
             }
         }
-        #[cfg(not(unix))]
+        #[cfg(windows)]
+        {
+            if !env::var("FORO_WINDOWS_IS_DAEMON").is_ok() {
+                let current_exe = env::current_exe()?;
+                let args: Vec<String> = env::args().skip(1).collect();
+
+                let res = process::Command::new(current_exe)
+                    .args(args)
+                    .env("FORO_WINDOWS_IS_DAEMON", "1")
+                    .spawn();
+
+                if let Err(err) = res {
+                    error!("Failed to start daemon: {}", err);
+                    return Err(anyhow!("Failed to start daemon: {}", err));
+                }
+
+                info!("Daemon started");
+
+                // In Windows, it takes a little while for the process to start,
+                // and if you try to connect during that time, we will get an error,
+                // so sleep a little
+
+                // todo: Even with this, errors still occur occasionally,
+                //   so we must use IPC to ensure that wait.
+                sleep(Duration::from_millis(10));
+
+                return Ok(());
+            }
+
+            IS_DAEMON_PROCESS.store(true, Ordering::SeqCst);
+            IS_DAEMON_MAIN_THREAD.with(|is_main_thread| {
+                let _ = is_main_thread.set(true);
+            });
+
+            let log_dir = log_dir_res()?;
+            DirBuilder::new().recursive(true).create(&log_dir)?;
+
+            let stdout_file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(log_dir.join("foro-stdout.log"))?;
+
+            let stderr_file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(log_dir.join("foro.log"))?;
+
+            let stdout_handle = stdout_file.as_raw_handle();
+            let stderr_handle = stderr_file.as_raw_handle();
+
+            unsafe {
+                SetStdHandle(STD_INPUT_HANDLE, std::ptr::null_mut());
+                SetStdHandle(STD_OUTPUT_HANDLE, stdout_handle as HANDLE);
+                SetStdHandle(STD_ERROR_HANDLE, stderr_handle as HANDLE);
+            }
+
+            let pid = process::id();
+            let start_time = get_start_time(pid)?;
+
+            DAEMON_INFO
+                .set(DaemonInfo {
+                    pid,
+                    start_time,
+                    stdout_path: OutputPath::Path(log_dir.join("foro-stdout.log")),
+                    stderr_path: OutputPath::Path(log_dir.join("foro.log")),
+                })
+                .unwrap();
+
+            let listener = WrappedUnixSocket::bind(&socket.socket_path)?;
+
+            daemon_main(listener);
+
+            process::exit(0);
+        }
+
+        #[cfg(not(any(unix, windows)))]
         {
             panic!(
                 "not attached daemon is not supported on this platform! please run `foro daemon start -a`"
