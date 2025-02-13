@@ -33,8 +33,8 @@ os_pipe = "1.2.1"
 notify = "6.1.1"
 libloading = "0.8.5"
 sysinfo = "0.31.4"
-# dll-pack = { git = "https://github.com/nahco314/dll-pack", version = "0.2.0" }
-dll-pack = { path = "../dll-pack" }
+dll-pack = { git = "https://github.com/nahco314/dll-pack", version = "0.2.1" }
+# dll-pack = { path = "../dll-pack" }
 ignore = "0.4.23"
 anstyle = "1.0.10"
 num_cpus = "1.16.0"

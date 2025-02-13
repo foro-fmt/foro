@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::path::PathBuf;
 
 #[cfg(not(windows))]
@@ -8,6 +8,8 @@ pub fn normalize_path(path: &PathBuf) -> Result<PathBuf> {
 
 #[cfg(windows)]
 pub fn normalize_path(path: &PathBuf) -> Result<PathBuf> {
+    use anyhow::Context;
+
     let abs = path.canonicalize()?;
 
     // This is like be `\\?\C:\\Users\...`.

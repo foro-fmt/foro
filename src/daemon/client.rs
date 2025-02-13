@@ -3,16 +3,13 @@ use crate::daemon::interface::{
     DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands, DaemonFormatResponse,
     DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath,
 };
+use crate::daemon::uds::UnixStream;
 use crate::process_utils::{get_start_time, is_alive};
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info};
 use std::env::current_dir;
 use std::io::{ErrorKind, Write};
-#[cfg(unix)]
-use std::os::unix::net::UnixStream;
 use std::time::Duration;
-#[cfg(windows)]
-use uds_windows::UnixStream;
 
 fn parse_info(info_str: &str) -> Option<(u32, u64)> {
     let parts: Vec<&str> = info_str.split(',').collect();

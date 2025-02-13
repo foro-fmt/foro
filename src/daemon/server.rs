@@ -8,6 +8,7 @@ use crate::daemon::interface::{
     DaemonFormatArgs, DaemonFormatResponse, DaemonInfo, DaemonPureFormatArgs,
     DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath, OutputPath,
 };
+use crate::daemon::uds::{UnixListener, UnixStream};
 use crate::debug_long;
 use crate::handle_plugin::run::{run, run_pure};
 use crate::log::IS_DAEMON_PROCESS;
@@ -18,8 +19,6 @@ use anyhow::Result;
 use anyhow::{anyhow, Context};
 use foro_plugin_utils::data_json_utils::JsonGetter;
 use log::{debug, error, info, trace, warn};
-#[cfg(unix)]
-use nix::unistd::{close, fork, setsid, ForkResult};
 use notify::Watcher;
 use serde_json::json;
 use std::fmt::format;
@@ -27,23 +26,13 @@ use std::fs::{DirBuilder, OpenOptions};
 use std::io::prelude::*;
 use std::io::{ErrorKind, Read};
 use std::net::Shutdown;
-#[cfg(unix)]
-use std::os::fd::IntoRawFd;
-#[cfg(unix)]
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::os::windows::io::{AsHandle, AsRawHandle};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, OnceLock};
 use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use std::{env, fs, io, process, thread};
-#[cfg(windows)]
-use uds_windows::{UnixListener, UnixStream};
-use winapi::um::processenv::SetStdHandle;
-use winapi::um::winbase::{STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
-use winapi::um::winnt::HANDLE;
+use std::{fs, io, process, thread};
 
 static DAEMON_INFO: OnceLock<DaemonInfo> = OnceLock::new();
 
@@ -511,6 +500,167 @@ pub fn daemon_main(socket: WrappedUnixSocket) {
     info!("Daemon exited");
 }
 
+#[cfg(unix)]
+fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
+    use nix::unistd::{close, fork, setsid, ForkResult};
+    use std::os::fd::IntoRawFd;
+
+    let (mut reader, mut writer) = os_pipe::pipe()?;
+
+    match unsafe { fork()? } {
+        ForkResult::Parent { child: _child } => {
+            info!("Daemon started");
+
+            let mut buf = [0];
+            match reader.read(buf.as_mut_slice()) {
+                Ok(_) => Ok(()),
+                Err(err) => {
+                    error!("Failed to read from child: {}", err);
+                    Err(anyhow!("Failed to start daemon"))
+                }
+            }
+        }
+        ForkResult::Child => {
+            IS_DAEMON_PROCESS.store(true, Ordering::SeqCst);
+            IS_DAEMON_MAIN_THREAD.with(|is_main_thread| {
+                let _ = is_main_thread.set(true);
+            });
+
+            setsid()?;
+
+            let log_dir = log_dir_res()?;
+            DirBuilder::new().recursive(true).create(&log_dir)?;
+
+            let stdout_fd = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(log_dir.join("foro-stdout.log"))?
+                .into_raw_fd();
+
+            let stderr_fd = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(log_dir.join("foro.log"))?
+                .into_raw_fd();
+
+            close(0)?;
+            nix::unistd::dup2(stdout_fd, 1)?;
+            nix::unistd::dup2(stderr_fd, 2)?;
+
+            let pid = process::id();
+            let start_time = get_start_time(pid)?;
+
+            DAEMON_INFO
+                .set(DaemonInfo {
+                    pid,
+                    start_time,
+                    stdout_path: OutputPath::Path(log_dir.join("foro-stdout.log")),
+                    stderr_path: OutputPath::Path(log_dir.join("foro.log")),
+                })
+                .unwrap();
+
+            let listener = WrappedUnixSocket::bind(&socket.socket_path)?;
+
+            writer.write_all(&[0])?;
+
+            daemon_main(listener);
+
+            process::exit(0);
+        }
+    }
+}
+
+#[cfg(windows)]
+fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
+    use std::os::windows::io::{AsHandle, AsRawHandle};
+    use winapi::um::processenv::SetStdHandle;
+    use winapi::um::winbase::{STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
+    use winapi::um::winnt::HANDLE;
+
+    if !env::var("FORO_WINDOWS_IS_DAEMON").is_ok() {
+        let current_exe = env::current_exe()?;
+        let args: Vec<String> = env::args().skip(1).collect();
+
+        let res = process::Command::new(current_exe)
+            .args(args)
+            .env("FORO_WINDOWS_IS_DAEMON", "1")
+            .spawn();
+
+        if let Err(err) = res {
+            error!("Failed to start daemon: {}", err);
+            return Err(anyhow!("Failed to start daemon: {}", err));
+        }
+
+        info!("Daemon started");
+
+        // In Windows, it takes a little while for the process to start,
+        // and if you try to connect during that time, we will get an error,
+        // so sleep a little
+
+        // todo: Even with this, errors still occur occasionally,
+        //   so we must use IPC to ensure that wait.
+        sleep(Duration::from_millis(10));
+
+        return Ok(());
+    }
+
+    IS_DAEMON_PROCESS.store(true, Ordering::SeqCst);
+    IS_DAEMON_MAIN_THREAD.with(|is_main_thread| {
+        let _ = is_main_thread.set(true);
+    });
+
+    let log_dir = log_dir_res()?;
+    DirBuilder::new().recursive(true).create(&log_dir)?;
+
+    let stdout_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(true)
+        .open(log_dir.join("foro-stdout.log"))?;
+
+    let stderr_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(true)
+        .open(log_dir.join("foro.log"))?;
+
+    let stdout_handle = stdout_file.as_raw_handle();
+    let stderr_handle = stderr_file.as_raw_handle();
+
+    unsafe {
+        SetStdHandle(STD_INPUT_HANDLE, std::ptr::null_mut());
+        SetStdHandle(STD_OUTPUT_HANDLE, stdout_handle as HANDLE);
+        SetStdHandle(STD_ERROR_HANDLE, stderr_handle as HANDLE);
+    }
+
+    let pid = process::id();
+    let start_time = get_start_time(pid)?;
+
+    DAEMON_INFO
+        .set(DaemonInfo {
+            pid,
+            start_time,
+            stdout_path: OutputPath::Path(log_dir.join("foro-stdout.log")),
+            stderr_path: OutputPath::Path(log_dir.join("foro.log")),
+        })
+        .unwrap();
+
+    let listener = WrappedUnixSocket::bind(&socket.socket_path)?;
+
+    daemon_main(listener);
+
+    process::exit(0);
+}
+
+#[cfg(not(any(unix, windows)))]
+fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
+    panic!(
+        "not attached daemon is not supported on this platform! please run `foro daemon start -a`"
+    );
+}
+
 /// Start the daemon.
 ///
 /// If `attach` is true, the daemon will run in the current process.
@@ -539,157 +689,7 @@ pub fn start_daemon(socket: &DaemonSocketPath, attach: bool) -> Result<()> {
         let listener = WrappedUnixSocket::bind(&socket.socket_path)?;
         daemon_main(listener);
     } else {
-        #[cfg(unix)]
-        {
-            let (mut reader, mut writer) = os_pipe::pipe()?;
-
-            match unsafe { fork()? } {
-                ForkResult::Parent { child: _child } => {
-                    info!("Daemon started");
-
-                    let mut buf = [0];
-                    match reader.read(buf.as_mut_slice()) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            error!("Failed to read from child: {}", err);
-                            return Err(anyhow!("Failed to start daemon"));
-                        }
-                    }
-                }
-                ForkResult::Child => {
-                    IS_DAEMON_PROCESS.store(true, Ordering::SeqCst);
-                    IS_DAEMON_MAIN_THREAD.with(|is_main_thread| {
-                        let _ = is_main_thread.set(true);
-                    });
-
-                    setsid()?;
-
-                    let log_dir = log_dir_res()?;
-                    DirBuilder::new().recursive(true).create(&log_dir)?;
-
-                    let stdout_fd = OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .append(true)
-                        .open(log_dir.join("foro-stdout.log"))?
-                        .into_raw_fd();
-
-                    let stderr_fd = OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .append(true)
-                        .open(log_dir.join("foro.log"))?
-                        .into_raw_fd();
-
-                    close(0)?;
-                    nix::unistd::dup2(stdout_fd, 1)?;
-                    nix::unistd::dup2(stderr_fd, 2)?;
-
-                    let pid = process::id();
-                    let start_time = get_start_time(pid)?;
-
-                    DAEMON_INFO
-                        .set(DaemonInfo {
-                            pid,
-                            start_time,
-                            stdout_path: OutputPath::Path(log_dir.join("foro-stdout.log")),
-                            stderr_path: OutputPath::Path(log_dir.join("foro.log")),
-                        })
-                        .unwrap();
-
-                    let listener = WrappedUnixSocket::bind(&socket.socket_path)?;
-
-                    writer.write_all(&[0])?;
-
-                    daemon_main(listener);
-
-                    process::exit(0);
-                }
-            }
-        }
-        #[cfg(windows)]
-        {
-            if !env::var("FORO_WINDOWS_IS_DAEMON").is_ok() {
-                let current_exe = env::current_exe()?;
-                let args: Vec<String> = env::args().skip(1).collect();
-
-                let res = process::Command::new(current_exe)
-                    .args(args)
-                    .env("FORO_WINDOWS_IS_DAEMON", "1")
-                    .spawn();
-
-                if let Err(err) = res {
-                    error!("Failed to start daemon: {}", err);
-                    return Err(anyhow!("Failed to start daemon: {}", err));
-                }
-
-                info!("Daemon started");
-
-                // In Windows, it takes a little while for the process to start,
-                // and if you try to connect during that time, we will get an error,
-                // so sleep a little
-
-                // todo: Even with this, errors still occur occasionally,
-                //   so we must use IPC to ensure that wait.
-                sleep(Duration::from_millis(10));
-
-                return Ok(());
-            }
-
-            IS_DAEMON_PROCESS.store(true, Ordering::SeqCst);
-            IS_DAEMON_MAIN_THREAD.with(|is_main_thread| {
-                let _ = is_main_thread.set(true);
-            });
-
-            let log_dir = log_dir_res()?;
-            DirBuilder::new().recursive(true).create(&log_dir)?;
-
-            let stdout_file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .append(true)
-                .open(log_dir.join("foro-stdout.log"))?;
-
-            let stderr_file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .append(true)
-                .open(log_dir.join("foro.log"))?;
-
-            let stdout_handle = stdout_file.as_raw_handle();
-            let stderr_handle = stderr_file.as_raw_handle();
-
-            unsafe {
-                SetStdHandle(STD_INPUT_HANDLE, std::ptr::null_mut());
-                SetStdHandle(STD_OUTPUT_HANDLE, stdout_handle as HANDLE);
-                SetStdHandle(STD_ERROR_HANDLE, stderr_handle as HANDLE);
-            }
-
-            let pid = process::id();
-            let start_time = get_start_time(pid)?;
-
-            DAEMON_INFO
-                .set(DaemonInfo {
-                    pid,
-                    start_time,
-                    stdout_path: OutputPath::Path(log_dir.join("foro-stdout.log")),
-                    stderr_path: OutputPath::Path(log_dir.join("foro.log")),
-                })
-                .unwrap();
-
-            let listener = WrappedUnixSocket::bind(&socket.socket_path)?;
-
-            daemon_main(listener);
-
-            process::exit(0);
-        }
-
-        #[cfg(not(any(unix, windows)))]
-        {
-            panic!(
-                "not attached daemon is not supported on this platform! please run `foro daemon start -a`"
-            );
-        }
+        start_daemon_no_attach(socket)?;
     }
 
     Ok(())
