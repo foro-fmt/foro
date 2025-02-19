@@ -13,7 +13,7 @@ use crate::debug_long;
 use crate::handle_plugin::run::{run, run_pure};
 use crate::log::IS_DAEMON_PROCESS;
 use crate::log::{DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD};
-use crate::path_utils::normalize_path;
+use crate::path_utils::{normalize_path, to_wasm_path};
 use crate::process_utils::get_start_time;
 use anyhow::Result;
 use anyhow::{anyhow, Context};
@@ -86,10 +86,10 @@ pub fn daemon_format_execute_with_args(
         let res = run(
             &rule.some_cmd,
             json!({
-                "wasm-current-dir":  normalize_path(&current_dir)?,
-                "os-current-dir": current_dir.canonicalize()?.to_str().unwrap(),
-                "wasm-target": normalize_path(&t_target_path)?,
-                "os-target": &t_target_path.to_str().unwrap(),
+                "wasm-current-dir":  to_wasm_path(&current_dir)?,
+                "os-current-dir": normalize_path(&current_dir)?,
+                "wasm-target": to_wasm_path(&t_target_path)?,
+                "os-target": normalize_path(&t_target_path)?,
                 "raw-target": args.path,
                 "target-content": content,
             }),
@@ -218,10 +218,10 @@ pub fn daemon_pure_format_execute_with_args(
     let res = run_pure(
         &pure_cmd,
         json!({
-            "wasm-current-dir":  normalize_path(&current_dir)?,
-            "os-current-dir": current_dir.canonicalize()?.to_str().unwrap(),
-            "wasm-target": normalize_path(&target_path)?,
-            "os-target": &target_path.to_str().unwrap(),
+            "wasm-current-dir":  to_wasm_path(&current_dir)?,
+            "os-current-dir": normalize_path(&current_dir)?,
+            "wasm-target": to_wasm_path(&target_path)?,
+            "os-target": normalize_path(&target_path)?,
             "raw-target": args.path,
             "target-content": args.content,
         }),

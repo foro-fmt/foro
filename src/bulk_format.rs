@@ -3,7 +3,7 @@ use crate::daemon::interface::DaemonFormatResponse;
 use crate::debug_long;
 use crate::handle_plugin::run::run;
 use crate::log::DAEMON_THREAD_START;
-use crate::path_utils::normalize_path;
+use crate::path_utils::{normalize_path, to_wasm_path};
 use anyhow::{Context, Result};
 use ignore::overrides::OverrideBuilder;
 use ignore::{WalkBuilder, WalkParallel, WalkState};
@@ -49,10 +49,10 @@ fn format_file(
     let res = run(
         &rule.some_cmd,
         json!({
-            "wasm-current-dir":  normalize_path(&current_dir)?,
-            "os-current-dir": current_dir.canonicalize()?.to_str().unwrap(),
-            "wasm-target": normalize_path(&path)?,
-            "os-target": &path.to_str().unwrap(),
+            "wasm-current-dir":  to_wasm_path(&current_dir)?,
+            "os-current-dir": normalize_path(&current_dir)?,
+            "wasm-target": to_wasm_path(&path)?,
+            "os-target": normalize_path(&path)?,
             "raw-target": path,
             "target-content": contents,
         }),

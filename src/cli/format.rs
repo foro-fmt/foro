@@ -5,7 +5,7 @@ use crate::daemon::interface::{DaemonCommands, DaemonFormatArgs, DaemonSocketPat
 use crate::daemon::server::start_daemon;
 use crate::debug_long;
 use crate::handle_plugin::run::run;
-use crate::path_utils::normalize_path;
+use crate::path_utils::{normalize_path, to_wasm_path};
 use anyhow::{Context, Result};
 use clap::Parser;
 use log::{debug, info};
@@ -43,10 +43,10 @@ fn format_with_no_daemon(args: FormatArgs, global_options: GlobalOptions) -> Res
     let res = run(
         &rule.some_cmd,
         json!({
-            "wasm-current-dir":  normalize_path(&current_dir()?)?,
-            "os-current-dir": current_dir()?.canonicalize()?.to_str().unwrap(),
-            "wasm-target": normalize_path(&target_path)?,
-            "os-target": &target_path.to_str().unwrap(),
+            "wasm-current-dir":  to_wasm_path(&current_dir()?)?,
+            "os-current-dir": normalize_path(&current_dir()?)?,
+            "wasm-target": to_wasm_path(&target_path)?,
+            "os-target":  normalize_path(&target_path)?,
             "raw-target": args.path,
             "target-content": contents,
         }),

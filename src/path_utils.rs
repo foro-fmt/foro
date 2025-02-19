@@ -18,6 +18,26 @@ pub fn normalize_path(path: &PathBuf) -> Result<PathBuf> {
     // Remove `\\?\`.
     let path_str = &path_str[4..];
 
+    Ok(PathBuf::from(path_str))
+}
+
+#[cfg(not(windows))]
+pub fn to_wasm_path(path: &PathBuf) -> Result<PathBuf> {
+    path.canonicalize().map_err(|e| e.into())
+}
+
+#[cfg(windows)]
+pub fn to_wasm_path(path: &PathBuf) -> Result<PathBuf> {
+    use anyhow::Context;
+
+    let abs = path.canonicalize()?;
+
+    // This is like be `\\?\C:\\Users\...`.
+    let path_str = abs.to_str().context("Failed to convert path to string")?;
+
+    // Remove `\\?\`.
+    let path_str = &path_str[4..];
+
     // Get name of drive, like `C`.
     let drive = path_str.chars().next().context("Failed to get drive")?;
 
