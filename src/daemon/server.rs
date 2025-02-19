@@ -574,6 +574,7 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
 
 #[cfg(windows)]
 fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
+    use std::env;
     use std::os::windows::io::{AsHandle, AsRawHandle};
     use winapi::um::processenv::SetStdHandle;
     use winapi::um::winbase::{STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};

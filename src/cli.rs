@@ -9,6 +9,7 @@ use std::time::Instant;
 
 mod bulk_format;
 mod cache;
+mod config;
 mod daemon;
 pub mod format;
 mod internal;
@@ -17,6 +18,7 @@ use format::*;
 
 use crate::cli::bulk_format::{bulk_format_execute_with_args, BulkFormatArgs};
 use crate::cli::cache::{cache_execute_with_args, CacheArgs};
+use crate::cli::config::{config_execute_with_args, ConfigArgs};
 use crate::cli::daemon::{daemon_execute_with_args, DaemonArgs};
 use crate::cli::internal::{internal_execute_with_args, InternalArgs};
 use crate::log::{init_env_logger, DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD, IS_DAEMON_PROCESS};
@@ -26,6 +28,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Parser, Debug)]
 pub enum SubCommands {
     Cache(CacheArgs),
+    Config(ConfigArgs),
     Daemon(DaemonArgs),
     Format(FormatArgs),
     BulkFormat(BulkFormatArgs),
@@ -80,6 +83,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
 
     match args.subcommand {
         SubCommands::Cache(s_args) => cache_execute_with_args(s_args, global_options),
+        SubCommands::Config(s_args) => config_execute_with_args(s_args, global_options),
         SubCommands::Daemon(s_args) => daemon_execute_with_args(s_args, global_options),
         SubCommands::Format(s_args) => format_execute_with_args(s_args, global_options),
         SubCommands::BulkFormat(s_args) => bulk_format_execute_with_args(s_args, global_options),
