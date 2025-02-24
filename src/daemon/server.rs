@@ -340,6 +340,8 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 fn read_stream_with_retry(stream: &mut UnixStream, buf: &mut Vec<u8>) -> Result<()> {
     // There is a slight time lag between when the UnixStream receives communication and when
     // all the input data is written to the stream, so if it fails, we retry after a short delay.
+    // So we need to retry until we get all the data.
+    //
     // retry_cnt is recorded and logged for debugging purposes only.
 
     let mut retry_cnt = 0;
