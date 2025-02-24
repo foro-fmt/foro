@@ -1,5 +1,8 @@
+use anyhow::{anyhow, Context};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
+use std::io::Read;
 use std::path::PathBuf;
 use url::Url;
 
@@ -24,10 +27,7 @@ impl OnRule {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum PureCommand {
-    PluginUrl(
-        #[serde(with = "url_serde")]
-        Url,
-    ),
+    PluginUrl(#[serde(with = "url_serde")] Url),
     CommandIO { io: String },
 }
 
@@ -116,11 +116,24 @@ impl Config {
     }
 }
 
+#[allow(unused)]
+pub fn load_str(json: &str) -> anyhow::Result<Config> {
+    serde_json::from_str(json).map_err(|e| anyhow!(e))
+}
+
+pub fn load_file(path: &PathBuf) -> anyhow::Result<Config> {
+    // memo: in my measurement, this implementation is faster than serde_json::from_reader, etc
+    let mut file = fs::File::open(path).context("Failed to open file")?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    serde_json::from_slice(&buffer).map_err(|e| anyhow!(e))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    
+
     #[test]
     fn test_on_rule_extension_match() {
         let on_rule = OnRule::Extension(".rs".to_string());
@@ -129,10 +142,16 @@ mod tests {
         assert!(on_rule.on_match(&path), "Should match `.rs` extension");
 
         let path_ts = PathBuf::from("example.ts");
-        assert!(!on_rule.on_match(&path_ts), "Should not match `.ts` extension");
+        assert!(
+            !on_rule.on_match(&path_ts),
+            "Should not match `.ts` extension"
+        );
 
         let path_no_ext = PathBuf::from("Makefile");
-        assert!(!on_rule.on_match(&path_no_ext), "Should not match no extension path");
+        assert!(
+            !on_rule.on_match(&path_no_ext),
+            "Should not match no extension path"
+        );
     }
 
     #[test]
@@ -149,24 +168,33 @@ mod tests {
         assert!(on_rule.on_match(&path_js), "Should match a `.js` file");
 
         let path_ts = PathBuf::from("hello.ts");
-        assert!(!on_rule.on_match(&path_ts), "Should not match `.ts` extension");
+        assert!(
+            !on_rule.on_match(&path_ts),
+            "Should not match `.ts` extension"
+        );
     }
 
     #[test]
     fn test_some_command_is_pure() {
         let pure_command = SomeCommand::Pure {
-            cmd: CommandWithControlFlow::Command(
-                PureCommand::PluginUrl("https://example.com/plugin.dllpack".parse().unwrap())
-            ),
+            cmd: CommandWithControlFlow::Command(PureCommand::PluginUrl(
+                "https://example.com/plugin.dllpack".parse().unwrap(),
+            )),
         };
-        assert!(pure_command.is_pure(), "Expected a pure command to be recognized as pure");
+        assert!(
+            pure_command.is_pure(),
+            "Expected a pure command to be recognized as pure"
+        );
 
         let write_command = SomeCommand::Write {
-            write_cmd: CommandWithControlFlow::Command(
-                WriteCommand::SimpleCommand("echo Hello".to_string())
-            ),
+            write_cmd: CommandWithControlFlow::Command(WriteCommand::SimpleCommand(
+                "echo Hello".to_string(),
+            )),
         };
-        assert!(!write_command.is_pure(), "Expected a write command not to be recognized as pure");
+        assert!(
+            !write_command.is_pure(),
+            "Expected a write command not to be recognized as pure"
+        );
     }
 
     #[test]
@@ -174,28 +202,42 @@ mod tests {
         let pure_rule = Rule {
             on: OnRule::Extension(".py".to_string()),
             some_cmd: SomeCommand::Pure {
-                cmd: CommandWithControlFlow::Command(
-                    PureCommand::PluginUrl("https://example.com/python_formatter.dllpack".parse().unwrap())
-                ),
+                cmd: CommandWithControlFlow::Command(PureCommand::PluginUrl(
+                    "https://example.com/python_formatter.dllpack"
+                        .parse()
+                        .unwrap(),
+                )),
             },
         };
 
         let path_py = PathBuf::from("script.py");
-        assert!(pure_rule.on_match(&path_py, false), "Should match `.py` extension in non-pure mode");
-        assert!(pure_rule.on_match(&path_py, true), "Should match `.py` extension in pure mode");
+        assert!(
+            pure_rule.on_match(&path_py, false),
+            "Should match `.py` extension in non-pure mode"
+        );
+        assert!(
+            pure_rule.on_match(&path_py, true),
+            "Should match `.py` extension in pure mode"
+        );
 
         let write_rule = Rule {
             on: OnRule::Extension(".rs".to_string()),
             some_cmd: SomeCommand::Write {
-                write_cmd: CommandWithControlFlow::Command(
-                    WriteCommand::SimpleCommand("rustfmt {{ os-target }}".to_string())
-                ),
+                write_cmd: CommandWithControlFlow::Command(WriteCommand::SimpleCommand(
+                    "rustfmt {{ os-target }}".to_string(),
+                )),
             },
         };
 
         let path_rs = PathBuf::from("lib.rs");
-        assert!(write_rule.on_match(&path_rs, false), "Should match `.rs` extension in non-pure mode");
-        assert!(!write_rule.on_match(&path_rs, true), "Should not match if forced pure, but is a write command");
+        assert!(
+            write_rule.on_match(&path_rs, false),
+            "Should match `.rs` extension in non-pure mode"
+        );
+        assert!(
+            !write_rule.on_match(&path_rs, true),
+            "Should not match if forced pure, but is a write command"
+        );
     }
 
     #[test]
@@ -205,17 +247,17 @@ mod tests {
                 Rule {
                     on: OnRule::Extension(".ts".to_string()),
                     some_cmd: SomeCommand::Pure {
-                        cmd: CommandWithControlFlow::Command(
-                            PureCommand::PluginUrl("https://example.com/typescript.dllpack".parse().unwrap())
-                        ),
+                        cmd: CommandWithControlFlow::Command(PureCommand::PluginUrl(
+                            "https://example.com/typescript.dllpack".parse().unwrap(),
+                        )),
                     },
                 },
                 Rule {
                     on: OnRule::Extension(".rs".to_string()),
                     some_cmd: SomeCommand::Write {
-                        write_cmd: CommandWithControlFlow::Command(
-                            WriteCommand::SimpleCommand("rustfmt {{ os-target }}".to_string())
-                        ),
+                        write_cmd: CommandWithControlFlow::Command(WriteCommand::SimpleCommand(
+                            "rustfmt {{ os-target }}".to_string(),
+                        )),
                     },
                 },
             ],
@@ -225,13 +267,25 @@ mod tests {
 
         let path_ts = PathBuf::from("app.ts");
         let matched_ts = config.find_matched_rule(&path_ts, false);
-        assert!(matched_ts.is_some(), "Should find a matching rule for `.ts`");
-        assert!(matched_ts.unwrap().some_cmd.is_pure(), "Expected `.ts` rule to be a pure command");
+        assert!(
+            matched_ts.is_some(),
+            "Should find a matching rule for `.ts`"
+        );
+        assert!(
+            matched_ts.unwrap().some_cmd.is_pure(),
+            "Expected `.ts` rule to be a pure command"
+        );
 
         let path_rs = PathBuf::from("main.rs");
         let matched_rs = config.find_matched_rule(&path_rs, false);
-        assert!(matched_rs.is_some(), "Should find a matching rule for `.rs`");
-        assert!(!matched_rs.unwrap().some_cmd.is_pure(), "Expected `.rs` rule to be a write command");
+        assert!(
+            matched_rs.is_some(),
+            "Should find a matching rule for `.rs`"
+        );
+        assert!(
+            !matched_rs.unwrap().some_cmd.is_pure(),
+            "Expected `.rs` rule to be a write command"
+        );
 
         let path_py = PathBuf::from("script.py");
         let matched_py = config.find_matched_rule(&path_py, false);
@@ -241,32 +295,40 @@ mod tests {
     #[test]
     fn test_config_serde_roundtrip() {
         let original_config = Config {
-            rules: vec![
-                Rule {
-                    on: OnRule::Or(vec![
-                        OnRule::Extension(".json".to_string()),
-                        OnRule::Extension(".yaml".to_string()),
-                    ]),
-                    some_cmd: SomeCommand::Pure {
-                        cmd: CommandWithControlFlow::Command(
-                            PureCommand::PluginUrl("https://example.com/json_plugin.dllpack".parse().unwrap())
-                        ),
-                    },
-                }
-            ],
+            rules: vec![Rule {
+                on: OnRule::Or(vec![
+                    OnRule::Extension(".json".to_string()),
+                    OnRule::Extension(".yaml".to_string()),
+                ]),
+                some_cmd: SomeCommand::Pure {
+                    cmd: CommandWithControlFlow::Command(PureCommand::PluginUrl(
+                        "https://example.com/json_plugin.dllpack".parse().unwrap(),
+                    )),
+                },
+            }],
             cache_dir: Some(PathBuf::from("/custom/cache/foro")),
             socket_dir: None,
         };
 
         let serialized = serde_json::to_string(&original_config).expect("Should serialize config");
-        let deserialized: Config = serde_json::from_str(&serialized).expect("Should deserialize config");
+        let deserialized: Config =
+            serde_json::from_str(&serialized).expect("Should deserialize config");
 
         assert_eq!(original_config.rules.len(), deserialized.rules.len());
         assert_eq!(original_config.cache_dir, deserialized.cache_dir);
         assert_eq!(original_config.socket_dir, deserialized.socket_dir);
 
-        if let Some(Rule { on: OnRule::Or(rules), some_cmd, ..}) = deserialized.rules.get(0) {
-            assert_eq!(rules.len(), 2, "Expected two OnRule::Extension inside OnRule::Or");
+        if let Some(Rule {
+            on: OnRule::Or(rules),
+            some_cmd,
+            ..
+        }) = deserialized.rules.get(0)
+        {
+            assert_eq!(
+                rules.len(),
+                2,
+                "Expected two OnRule::Extension inside OnRule::Or"
+            );
             assert!(some_cmd.is_pure(), "Expected a pure command");
         } else {
             panic!("Expected the first rule to be OnRule::Or with a pure command");
@@ -284,13 +346,11 @@ mod tests {
 
         let rule_cmd: Rule = serde_json::from_str(json_str_cmd).unwrap();
         match &rule_cmd.some_cmd {
-            SomeCommand::Pure { cmd } => {
-                match cmd {
-                    CommandWithControlFlow::Command(PureCommand::PluginUrl(url)) => {
-                        assert_eq!(url.as_str(), "https://example.com/plugin.dllpack");
-                    },
-                    _ => panic!("Expected a direct plugin URL in pure command"),
+            SomeCommand::Pure { cmd } => match cmd {
+                CommandWithControlFlow::Command(PureCommand::PluginUrl(url)) => {
+                    assert_eq!(url.as_str(), "https://example.com/plugin.dllpack");
                 }
+                _ => panic!("Expected a direct plugin URL in pure command"),
             },
             _ => panic!("Expected a pure command for `.ts`"),
         }
@@ -304,13 +364,11 @@ mod tests {
 
         let rule_write_cmd: Rule = serde_json::from_str(json_str_write_cmd).unwrap();
         match &rule_write_cmd.some_cmd {
-            SomeCommand::Write { write_cmd } => {
-                match write_cmd {
-                    CommandWithControlFlow::Command(WriteCommand::SimpleCommand(s)) => {
-                        assert!(s.contains("rustfmt"));
-                    },
-                    _ => panic!("Expected a simple command for `.rs`"),
+            SomeCommand::Write { write_cmd } => match write_cmd {
+                CommandWithControlFlow::Command(WriteCommand::SimpleCommand(s)) => {
+                    assert!(s.contains("rustfmt"));
                 }
+                _ => panic!("Expected a simple command for `.rs`"),
             },
             _ => panic!("Expected a write command for `.rs`"),
         }

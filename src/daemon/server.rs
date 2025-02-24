@@ -1,4 +1,4 @@
-use crate::app_dir::log_dir_res;
+use crate::app_dir::{AppDirResolver, DefaultAppDirResolver};
 use crate::bulk_format::{bulk_format, BulkFormatOption};
 use crate::cli::GlobalOptions;
 use crate::config::load_config_and_cache;
@@ -530,8 +530,11 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
             });
 
             setsid()?;
+            
+            // todo: It is not good design to directly obtain log_dir here.
 
-            let log_dir = log_dir_res()?;
+            let resolver = DefaultAppDirResolver {};
+            let log_dir = resolver.log_dir_res()?;
             DirBuilder::new().recursive(true).create(&log_dir)?;
 
             let stdout_fd = OpenOptions::new()
@@ -615,7 +618,8 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
         let _ = is_main_thread.set(true);
     });
 
-    let log_dir = log_dir_res()?;
+    let resolver = DefaultAppDirResolver {};
+    let log_dir = resolver.log_dir_res()?;
     DirBuilder::new().recursive(true).create(&log_dir)?;
 
     let stdout_file = OpenOptions::new()

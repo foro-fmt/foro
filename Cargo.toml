@@ -50,3 +50,6 @@ libc = "0.2.161"
 winsplit = "0.1.0"
 uds_windows = "1.1.0"
 winapi = { version = "0.3", features = ["winbase", "minwindef", "winnt", "processthreadsapi", "processenv"] }
+
+[dev-dependencies]
+tempfile = "3.17.1"
