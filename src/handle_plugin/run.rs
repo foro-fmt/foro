@@ -1,4 +1,3 @@
-use crate::config::{CommandWithControlFlow, PureCommand, SomeCommand, WriteCommand};
 use crate::{debug_long, trace_long};
 use anyhow::{anyhow, Context, Result};
 use dll_pack::load::{NativeLibrary, WasmLibrary};
@@ -13,6 +12,7 @@ use std::path::PathBuf;
 use url::Url;
 use wasmtime::{Instance, Store};
 use wasmtime_wasi::preview1::WasiP1Ctx;
+use crate::config::{CommandWithControlFlow, PureCommand, SomeCommand, WriteCommand};
 
 struct PluginSetting {
     pub source: Url,
@@ -170,7 +170,7 @@ fn run_inner_pure_command(
     match command {
         PureCommand::PluginUrl(url) => {
             let setting = PluginSetting {
-                source: url.clone().into_inner(),
+                source: url.clone(),
                 cache: true,
             };
 

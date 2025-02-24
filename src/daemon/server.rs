@@ -1,7 +1,7 @@
 use crate::app_dir::log_dir_res;
 use crate::bulk_format::{bulk_format, BulkFormatOption};
 use crate::cli::GlobalOptions;
-use crate::config::{load_config_and_cache, Rule, SomeCommand};
+use crate::config::load_config_and_cache;
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
     DaemonBulkFormatArgs, DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands,
@@ -33,6 +33,7 @@ use std::sync::{mpsc, OnceLock};
 use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs, io, process, thread};
+use crate::config::{Rule, SomeCommand};
 
 static DAEMON_INFO: OnceLock<DaemonInfo> = OnceLock::new();
 

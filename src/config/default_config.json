@@ -1,0 +1,26 @@
+{
+    "rules": [
+        {
+            "on": [".ts", ".tsx", ".js", ".mjs", ".cjs", ".json"],
+            "cmd": "https://github.com/nahco314/foro-biome/releases/download/0.5.1/foro-biome.dllpack"
+        },
+        {
+            "on": ".rs",
+            "cmd": "https://github.com/nahco314/foro-rustfmt/releases/download/0.4.1/foro-rustfmt.dllpack"
+        },
+        {
+            "on": ".py",
+            "cmd": "https://github.com/nahco314/foro-ruff/releases/download/0.3.1/foro-ruff.dllpack"
+        },
+        {
+            "on": ".go",
+            "cmd": {
+                "io": "gofmt"
+            }
+        },
+        {
+            "on": [".c", ".cpp", ".h", ".hpp"],
+            "cmd": "https://github.com/nahco314/foro-clang-format/releases/download/0.2.0/foro-clang-format.dllpack"
+        }
+    ]
+}
