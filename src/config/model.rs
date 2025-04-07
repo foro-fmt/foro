@@ -243,28 +243,22 @@ mod tests {
 
     #[test]
     fn test_config_find_matched_rule() {
-        let config = Config {
-            rules: vec![
-                Rule {
-                    on: OnRule::Extension(".ts".to_string()),
-                    some_cmd: SomeCommand::Pure {
-                        cmd: CommandWithControlFlow::Command(PureCommand::PluginUrl(
-                            "https://example.com/typescript.dllpack".parse().unwrap(),
-                        )),
-                    },
+        let json = r#"{
+            "rules": [
+                {
+                    "on": ".ts",
+                    "cmd": "https://example.com/typescript.dllpack"
                 },
-                Rule {
-                    on: OnRule::Extension(".rs".to_string()),
-                    some_cmd: SomeCommand::Write {
-                        write_cmd: CommandWithControlFlow::Command(WriteCommand::SimpleCommand(
-                            "rustfmt {{ os-target }}".to_string(),
-                        )),
-                    },
-                },
+                {
+                    "on": ".rs",
+                    "write_cmd": "rustfmt {{ os-target }}"
+                }
             ],
-            cache_dir: None,
-            socket_dir: None,
-        };
+            "cache_dir": null,
+            "socket_dir": null
+        }"#;
+        
+        let config: Config = serde_json::from_str(json).expect("Should parse valid JSON");
 
         let path_ts = PathBuf::from("app.ts");
         let matched_ts = config.find_matched_rule(&path_ts, false);
@@ -295,22 +289,18 @@ mod tests {
 
     #[test]
     fn test_config_serde_roundtrip() {
-        let original_config = Config {
-            rules: vec![Rule {
-                on: OnRule::Or(vec![
-                    OnRule::Extension(".json".to_string()),
-                    OnRule::Extension(".yaml".to_string()),
-                ]),
-                some_cmd: SomeCommand::Pure {
-                    cmd: CommandWithControlFlow::Command(PureCommand::PluginUrl(
-                        "https://example.com/json_plugin.dllpack".parse().unwrap(),
-                    )),
-                },
-            }],
-            cache_dir: Some(PathBuf::from("/custom/cache/foro")),
-            socket_dir: None,
-        };
-
+        let json = r#"{
+            "rules": [
+                {
+                    "on": [".json", ".yaml"],
+                    "cmd": "https://example.com/json_plugin.dllpack"
+                }
+            ],
+            "cache_dir": "/custom/cache/foro",
+            "socket_dir": null
+        }"#;
+        
+        let original_config: Config = serde_json::from_str(json).expect("Should parse valid JSON");
         let serialized = serde_json::to_string(&original_config).expect("Should serialize config");
         let deserialized: Config =
             serde_json::from_str(&serialized).expect("Should deserialize config");
@@ -377,24 +367,15 @@ mod tests {
 
     #[test]
     fn test_command_with_control_flow_if() {
-        let run_command = CommandWithControlFlow::Command(PureCommand::PluginUrl(
-            "https://example.com/plugin.dllpack".parse().unwrap(),
-        ));
-
-        let true_command = CommandWithControlFlow::Command(PureCommand::PluginUrl(
-            "https://example.com/true.dllpack".parse().unwrap(),
-        ));
-
-        let false_command = CommandWithControlFlow::Command(PureCommand::PluginUrl(
-            "https://example.com/false.dllpack".parse().unwrap(),
-        ));
-
-        let if_command = CommandWithControlFlow::If {
-            run: Box::new(run_command.clone()),
-            cond: "test_condition".to_string(),
-            on_true: Box::new(true_command.clone()),
-            on_false: Box::new(false_command.clone()),
-        };
+        let json = r#"{
+            "run": "https://example.com/plugin.dllpack",
+            "cond": "test_condition",
+            "on_true": "https://example.com/true.dllpack",
+            "on_false": "https://example.com/false.dllpack"
+        }"#;
+        
+        let if_command: CommandWithControlFlow<PureCommand> = 
+            serde_json::from_str(json).expect("Should parse valid JSON");
 
         match if_command {
             CommandWithControlFlow::If { run, cond, on_true, on_false } => {
@@ -418,15 +399,13 @@ mod tests {
 
     #[test]
     fn test_command_with_control_flow_sequential() {
-        let command1 = CommandWithControlFlow::Command(PureCommand::PluginUrl(
-            "https://example.com/plugin1.dllpack".parse().unwrap(),
-        ));
-
-        let command2 = CommandWithControlFlow::Command(PureCommand::PluginUrl(
-            "https://example.com/plugin2.dllpack".parse().unwrap(),
-        ));
-
-        let sequential = CommandWithControlFlow::Sequential(vec![command1, command2]);
+        let json = r#"[
+            "https://example.com/plugin1.dllpack",
+            "https://example.com/plugin2.dllpack"
+        ]"#;
+        
+        let sequential: CommandWithControlFlow<PureCommand> = 
+            serde_json::from_str(json).expect("Should parse valid JSON");
 
         match sequential {
             CommandWithControlFlow::Sequential(commands) => {
@@ -438,11 +417,15 @@ mod tests {
 
     #[test]
     fn test_command_with_control_flow_set() {
-        let mut vars = HashMap::new();
-        vars.insert("key1".to_string(), "value1".to_string());
-        vars.insert("key2".to_string(), "value2".to_string());
-
-        let set_command: CommandWithControlFlow<PureCommand> = CommandWithControlFlow::Set { set: vars.clone() };
+        let json = r#"{
+            "set": {
+                "key1": "value1",
+                "key2": "value2"
+            }
+        }"#;
+        
+        let set_command: CommandWithControlFlow<PureCommand> = 
+            serde_json::from_str(json).expect("Should parse valid JSON");
 
         match set_command {
             CommandWithControlFlow::Set { set } => {
@@ -493,9 +476,11 @@ mod tests {
     
     #[test]
     fn test_pure_command_command_io() {
-        let command_io = PureCommand::CommandIO { 
-            io: "cat {{ input }} | grep pattern".to_string() 
-        };
+        let json = r#"{
+            "io": "cat {{ input }} | grep pattern"
+        }"#;
+        
+        let command_io: PureCommand = serde_json::from_str(json).expect("Should parse valid JSON");
         
         match command_io {
             PureCommand::CommandIO { io } => {
@@ -507,7 +492,9 @@ mod tests {
     
     #[test]
     fn test_write_command_variants() {
-        let simple_cmd = WriteCommand::SimpleCommand("echo 'Hello World'".to_string());
+        let simple_cmd_json = r#""echo 'Hello World'""#;
+        
+        let simple_cmd: WriteCommand = serde_json::from_str(simple_cmd_json).expect("Should parse valid JSON");
         match simple_cmd {
             WriteCommand::SimpleCommand(cmd) => {
                 assert_eq!(cmd, "echo 'Hello World'");
@@ -515,9 +502,9 @@ mod tests {
             _ => panic!("Expected SimpleCommand variant"),
         }
         
-        let pure_cmd = WriteCommand::Pure(PureCommand::PluginUrl(
-            "https://example.com/plugin.dllpack".parse().unwrap()
-        ));
+        let pure_cmd_json = r#""https://example.com/plugin.dllpack""#;
+        
+        let pure_cmd: WriteCommand = serde_json::from_str(pure_cmd_json).expect("Should parse valid JSON");
         match pure_cmd {
             WriteCommand::Pure(_) => {},
             _ => panic!("Expected Pure variant"),
