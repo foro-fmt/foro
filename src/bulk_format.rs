@@ -31,7 +31,7 @@ fn format_file(
     config: &Config,
     cache_path: &PathBuf,
     use_cache: bool,
-) -> Result<bool> {  // 戻り値をboolに変更: trueは変更されたことを示す
+) -> Result<bool> {  // Return type changed to bool: true indicates the file was changed
     info!("Formatting: {:?}", path);
 
     let rule = config
@@ -71,7 +71,7 @@ fn format_file(
     
     info!("Success to format: {:?} ({})", path, if was_changed { "changed" } else { "unchanged" });
 
-    Ok(was_changed)  // ファイルが変更されたかどうかを返す
+    Ok(was_changed)  // Return whether the file was changed
 }
 
 pub fn bulk_format(
@@ -79,7 +79,7 @@ pub fn bulk_format(
     config: &Config,
     cache_path: &PathBuf,
     use_cache: bool,
-) -> Result<(usize, usize)> {  // (変更されたファイル数, 変更されなかったファイル数)を返す
+) -> Result<(usize, usize)> {  // Returns (count of changed files, count of unchanged files)
     let (fst, rest) = opt.paths.split_first().context("No path given")?;
 
     let mut walk_builder = WalkBuilder::new(fst);
