@@ -284,13 +284,13 @@ pub fn daemon_bulk_format_execute_with_args(
     let total_count = changed_count + unchanged_count;
     
     let message = if changed_count > 0 {
-        format!("Formatted {} files. Fixed {} {}.", 
+        format!("{} files processed. {} {} changed.", 
             total_count, 
             changed_count,
             if changed_count == 1 { "file" } else { "files" }
         )
     } else {
-        format!("Formatted {} files. No fixes applied.", total_count)
+        format!("{} files processed. No files changed.", total_count)
     };
 
     Ok(DaemonBulkFormatResponse::Success(message))
