@@ -280,11 +280,20 @@ pub fn daemon_bulk_format_execute_with_args(
         current_dir,
     };
 
-    let success_count = bulk_format(&opt, &config, &cache_dir, !global_options.no_cache)?;
+    let (changed_count, unchanged_count) = bulk_format(&opt, &config, &cache_dir, !global_options.no_cache)?;
+    let total_count = changed_count + unchanged_count;
+    
+    let message = if changed_count > 0 {
+        format!("Formatted {} files. Fixed {} {}.", 
+            total_count, 
+            changed_count,
+            if changed_count == 1 { "file" } else { "files" }
+        )
+    } else {
+        format!("Formatted {} files. No fixes applied.", total_count)
+    };
 
-    Ok(DaemonBulkFormatResponse::Success(format!(
-        "Formated {success_count} files"
-    )))
+    Ok(DaemonBulkFormatResponse::Success(message))
 }
 
 pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse {

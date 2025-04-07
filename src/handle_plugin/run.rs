@@ -404,10 +404,15 @@ pub fn run(
         SomeCommand::Pure { cmd } => {
             let target_path = String::get_value(&cur_json, ["os-target"])?;
 
-            let res = run_flow(cmd, run_inner_pure_command, cur_json, cache_path, use_cache)?;
+            let cur_json_clone = cur_json.clone();
+            let res = run_flow(cmd, run_inner_pure_command, cur_json_clone, cache_path, use_cache)?;
 
             if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
-                fs::write(target_path, formatted)?;
+                let original_content = String::get_value(&cur_json, ["target-content"])?;
+                
+                if formatted != original_content {
+                    fs::write(target_path, formatted)?;
+                }
             }
 
             res
