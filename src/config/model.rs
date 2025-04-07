@@ -470,4 +470,71 @@ mod tests {
         
         assert!(result.is_err(), "Should fail with invalid JSON");
     }
+    
+    #[test]
+    fn test_load_file_nonexistent() {
+        let nonexistent_path = PathBuf::from("/path/that/does/not/exist.json");
+        let result = load_file(&nonexistent_path);
+        
+        assert!(result.is_err(), "Should fail with nonexistent file");
+        assert!(result.unwrap_err().to_string().contains("Failed to open file"), 
+                "Error message should mention file opening failure");
+    }
+    
+    #[test]
+    fn test_none_helper_function() {
+        let result: Option<String> = none();
+        assert!(result.is_none(), "none() should return None");
+        
+        let result: Option<i32> = none();
+        assert!(result.is_none(), "none() should return None for any type");
+    }
+    
+    #[test]
+    fn test_pure_command_command_io() {
+        let command_io = PureCommand::CommandIO { 
+            io: "cat {{ input }} | grep pattern".to_string() 
+        };
+        
+        match command_io {
+            PureCommand::CommandIO { io } => {
+                assert_eq!(io, "cat {{ input }} | grep pattern");
+            },
+            _ => panic!("Expected CommandIO variant"),
+        }
+    }
+    
+    #[test]
+    fn test_write_command_variants() {
+        let simple_cmd = WriteCommand::SimpleCommand("echo 'Hello World'".to_string());
+        match simple_cmd {
+            WriteCommand::SimpleCommand(cmd) => {
+                assert_eq!(cmd, "echo 'Hello World'");
+            },
+            _ => panic!("Expected SimpleCommand variant"),
+        }
+        
+        let pure_cmd = WriteCommand::Pure(PureCommand::PluginUrl(
+            "https://example.com/plugin.dllpack".parse().unwrap()
+        ));
+        match pure_cmd {
+            WriteCommand::Pure(_) => {},
+            _ => panic!("Expected Pure variant"),
+        }
+    }
+    
+    #[test]
+    fn test_load_file_invalid_content() {
+        use tempfile::tempdir;
+        use std::io::Write;
+        
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("invalid.json");
+        
+        let mut file = fs::File::create(&file_path).unwrap();
+        file.write_all(b"{invalid json}").unwrap();
+        
+        let result = load_file(&file_path);
+        assert!(result.is_err(), "Should fail with invalid JSON content");
+    }
 }
