@@ -31,7 +31,8 @@ fn format_file(
     config: &Config,
     cache_path: &PathBuf,
     use_cache: bool,
-) -> Result<bool> {  // Return type changed to bool: true indicates the file was changed
+) -> Result<bool> {
+    // Return type changed to bool: true indicates the file was changed
     info!("Formatting: {:?}", path);
 
     let rule = config
@@ -62,16 +63,20 @@ fn format_file(
     )?;
 
     debug_long!("{:?}", res);
-    
-    let was_changed = if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
-        formatted != contents  // Check if content has changed by comparing with original
-    } else {
-        false  // Consider unchanged if no formatted content is available
-    };
-    
-    info!("Success to format: {:?} ({})", path, if was_changed { "changed" } else { "unchanged" });
 
-    Ok(was_changed)  // Return whether the file was changed
+    let was_changed = if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
+        formatted != contents // Check if content has changed by comparing with original
+    } else {
+        false // Consider unchanged if no formatted content is available
+    };
+
+    info!(
+        "Success to format: {:?} ({})",
+        path,
+        if was_changed { "changed" } else { "unchanged" }
+    );
+
+    Ok(was_changed) // Return whether the file was changed
 }
 
 pub fn bulk_format(
@@ -79,7 +84,8 @@ pub fn bulk_format(
     config: &Config,
     cache_path: &PathBuf,
     use_cache: bool,
-) -> Result<(usize, usize)> {  // Returns (count of changed files, count of unchanged files)
+) -> Result<(usize, usize)> {
+    // Returns (count of changed files, count of unchanged files)
     let (fst, rest) = opt.paths.split_first().context("No path given")?;
 
     let mut walk_builder = WalkBuilder::new(fst);
@@ -111,8 +117,8 @@ pub fn bulk_format(
     let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(|| Instant::now()));
 
     let formatting_threads = Arc::new(Mutex::new(Vec::new()));
-    let changed_count = Arc::new(AtomicUsize::new(0));     // Count of files that were changed
-    let unchanged_count = Arc::new(AtomicUsize::new(0));   // Count of files that were not changed
+    let changed_count = Arc::new(AtomicUsize::new(0)); // Count of files that were changed
+    let unchanged_count = Arc::new(AtomicUsize::new(0)); // Count of files that were not changed
     let running_count = Arc::new(AtomicUsize::new(0));
 
     walk.run(|| {

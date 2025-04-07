@@ -1,3 +1,4 @@
+use crate::config::{CommandWithControlFlow, PureCommand, SomeCommand, WriteCommand};
 use crate::{debug_long, trace_long};
 use anyhow::{anyhow, Context, Result};
 use dll_pack::load::{NativeLibrary, WasmLibrary};
@@ -12,7 +13,6 @@ use std::path::PathBuf;
 use url::Url;
 use wasmtime::{Instance, Store};
 use wasmtime_wasi::preview1::WasiP1Ctx;
-use crate::config::{CommandWithControlFlow, PureCommand, SomeCommand, WriteCommand};
 
 struct PluginSetting {
     pub source: Url,
@@ -405,11 +405,17 @@ pub fn run(
             let target_path = String::get_value(&cur_json, ["os-target"])?;
 
             let cur_json_clone = cur_json.clone();
-            let res = run_flow(cmd, run_inner_pure_command, cur_json_clone, cache_path, use_cache)?;
+            let res = run_flow(
+                cmd,
+                run_inner_pure_command,
+                cur_json_clone,
+                cache_path,
+                use_cache,
+            )?;
 
             if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
                 let original_content = String::get_value(&cur_json, ["target-content"])?;
-                
+
                 if formatted != original_content {
                     fs::write(target_path, formatted)?;
                 }

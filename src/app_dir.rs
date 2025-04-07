@@ -12,7 +12,8 @@ pub(crate) trait AppDirResolver {
     fn log_dir(&self) -> Option<PathBuf>;
 
     fn config_file_res(&self) -> Result<PathBuf> {
-        self.config_file().context("Failed to get default config file")
+        self.config_file()
+            .context("Failed to get default config file")
     }
 
     fn cache_dir_res(&self) -> Result<PathBuf> {
@@ -20,7 +21,8 @@ pub(crate) trait AppDirResolver {
     }
 
     fn socket_dir_res(&self) -> Result<PathBuf> {
-        self.socket_dir().context("Failed to get default socket dir")
+        self.socket_dir()
+            .context("Failed to get default socket dir")
     }
 
     fn log_dir_res(&self) -> Result<PathBuf> {
