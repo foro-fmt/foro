@@ -130,6 +130,7 @@ pub fn load_file(path: &PathBuf) -> anyhow::Result<Config> {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use std::path::PathBuf;
