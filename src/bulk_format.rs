@@ -64,9 +64,9 @@ fn format_file(
     debug_long!("{:?}", res);
     
     let was_changed = if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
-        formatted != contents  // 元の内容と比較して変更があるか確認
+        formatted != contents  // Check if content has changed by comparing with original
     } else {
-        false  // フォーマットされた内容がない場合は変更なしとみなす
+        false  // Consider unchanged if no formatted content is available
     };
     
     info!("Success to format: {:?} ({})", path, if was_changed { "changed" } else { "unchanged" });
@@ -111,8 +111,8 @@ pub fn bulk_format(
     let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(|| Instant::now()));
 
     let formatting_threads = Arc::new(Mutex::new(Vec::new()));
-    let changed_count = Arc::new(AtomicUsize::new(0));     // 変更されたファイル数
-    let unchanged_count = Arc::new(AtomicUsize::new(0));   // 変更されなかったファイル数
+    let changed_count = Arc::new(AtomicUsize::new(0));     // Count of files that were changed
+    let unchanged_count = Arc::new(AtomicUsize::new(0));   // Count of files that were not changed
     let running_count = Arc::new(AtomicUsize::new(0));
 
     walk.run(|| {
