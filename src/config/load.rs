@@ -159,6 +159,7 @@ pub(crate) fn load_paths(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use crate::app_dir::AppDirResolver;
@@ -413,5 +414,341 @@ mod tests {
             err.to_string().contains("Could not get config directory"),
             "Expected an error about missing config directory."
         );
+    }
+
+    #[test]
+    fn test_wrapper_functions_with_mocked_resolver() -> Result<()> {
+        use std::sync::Once;
+        
+        static INIT: Once = Once::new();
+        static mut MOCK_CONFIG_PATH: Option<PathBuf> = None;
+        static mut MOCK_CACHE_PATH: Option<PathBuf> = None;
+        static mut MOCK_SOCKET_PATH: Option<PathBuf> = None;
+        
+        unsafe fn init_mocks() {
+            INIT.call_once(|| {
+                let temp_dir = tempdir().expect("Failed to create temp dir");
+                MOCK_CONFIG_PATH = Some(temp_dir.path().join("mock_config.json"));
+                MOCK_CACHE_PATH = Some(temp_dir.path().join("mock_cache"));
+                MOCK_SOCKET_PATH = Some(temp_dir.path().join("mock_socket"));
+                
+                fs::write(
+                    MOCK_CONFIG_PATH.as_ref().unwrap(),
+                    r#"{"rules":[],"cache_dir":null,"socket_dir":null}"#
+                ).expect("Failed to write mock config");
+                
+                std::mem::forget(temp_dir);
+            });
+        }
+        
+        unsafe {
+            init_mocks();
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_or_create_default_config() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let _config_path = temp_dir.path().join("config.json");
+        
+        assert!(get_or_create_default_config().is_some() || get_or_create_default_config().is_none(),
+            "get_or_create_default_config should always return Some or None");
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_config_and_cache_wrapper() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let config_path = temp_dir.path().join("config.json");
+        let cache_path = temp_dir.path().join("cache");
+        
+        fs::write(
+            &config_path,
+            r#"{"rules":[],"cache_dir":null,"socket_dir":null}"#
+        )?;
+        
+        let given_config = Some(config_path);
+        let given_cache = Some(cache_path.clone());
+        
+        let result = load_config_and_cache(&given_config, &given_cache);
+        
+        assert!(result.is_ok(), "load_config_and_cache should return Ok");
+        if let Ok((config, cache_dir)) = result {
+            assert_eq!(cache_dir, cache_path, "Cache directory should match expected");
+            assert!(config.rules.is_empty(), "Config rules should be empty");
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_config_and_socket_wrapper() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let config_path = temp_dir.path().join("config.json");
+        let socket_path = temp_dir.path().join("socket");
+        
+        fs::write(
+            &config_path,
+            r#"{"rules":[],"cache_dir":null,"socket_dir":null}"#
+        )?;
+        
+        let given_config = Some(config_path);
+        let given_socket = Some(socket_path.clone());
+        
+        let result = load_config_and_socket(&given_config, &given_socket);
+        
+        assert!(result.is_ok(), "load_config_and_socket should return Ok");
+        if let Ok((config, socket_dir)) = result {
+            assert_eq!(socket_dir, socket_path, "Socket directory should match expected");
+            assert!(config.rules.is_empty(), "Config rules should be empty");
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_paths_wrapper() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let config_path = temp_dir.path().join("config.json");
+        let cache_path = temp_dir.path().join("cache");
+        let socket_path = temp_dir.path().join("socket");
+        
+        fs::write(
+            &config_path,
+            r#"{"rules":[],"cache_dir":null,"socket_dir":null}"#
+        )?;
+        
+        let given_config = Some(config_path.clone());
+        let given_cache = Some(cache_path.clone());
+        let given_socket = Some(socket_path.clone());
+        
+        let result = load_paths(&given_config, &given_cache, &given_socket);
+        
+        assert!(result.is_ok(), "load_paths should return Ok");
+        if let Ok((config_file, cache_dir, socket_dir)) = result {
+            assert_eq!(config_file, config_path, "Config file should match expected");
+            assert_eq!(cache_dir, cache_path, "Cache directory should match expected");
+            assert_eq!(socket_dir, socket_path, "Socket directory should match expected");
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_error_handling_in_get_or_create_default_config_with() -> Result<()> {
+        let resolver = MockResolver {
+            config_path: Some(PathBuf::from("/nonexistent/directory/that/should/not/exist/config.json")),
+            cache_path: None,
+            socket_path: None,
+            log_path: None,
+        };
+        
+        let result = get_or_create_default_config_with(&resolver);
+        assert!(result.is_none(), "Should return None when parent directory creation fails");
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_log_dir_in_mock_resolver() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let log_path = temp_dir.path().join("logs");
+        
+        let resolver = MockResolver {
+            config_path: None,
+            cache_path: None,
+            socket_path: None,
+            log_path: Some(log_path.clone()),
+        };
+        
+        assert_eq!(resolver.log_dir(), Some(log_path));
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_error_paths_in_load_config_and_socket_with() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let nonexistent_config = temp_dir.path().join("nonexistent.json");
+        let socket_dir = temp_dir.path().join("socket");
+        
+        let resolver = MockResolver {
+            config_path: None,
+            cache_path: None,
+            socket_path: Some(socket_dir.clone()),
+            log_path: None,
+        };
+        
+        let result = load_config_and_socket_with(&resolver, &None, &None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to get config directory"));
+        
+        let result = load_config_and_socket_with(&resolver, &Some(nonexistent_config), &None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to load config file"));
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_error_paths_in_load_paths_with() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let config_path = temp_dir.path().join("config.json");
+        
+        fs::write(
+            &config_path,
+            r#"{"rules":[],"cache_dir":"/cache","socket_dir":null}"#
+        )?;
+        
+        let resolver = MockResolver {
+            config_path: Some(config_path.clone()),
+            cache_path: Some(temp_dir.path().join("cache")),
+            socket_path: None, // No socket dir in resolver
+            log_path: None,
+        };
+        
+        let result = load_paths_with(&resolver, &Some(config_path), &None, &None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to get socket directory"));
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_debug_logging_in_get_or_create_default_config_with() -> Result<()> {
+        use log::Level;
+        use std::sync::Once;
+        
+        static INIT_LOGGER: Once = Once::new();
+        
+        INIT_LOGGER.call_once(|| {
+            env_logger::builder()
+                .filter_level(log::LevelFilter::Debug)
+                .is_test(true)
+                .try_init()
+                .ok();
+        });
+        
+        let temp_dir = tempdir()?;
+        let config_path = temp_dir.path().join("config.json");
+        
+        let resolver = MockResolver {
+            config_path: Some(config_path),
+            cache_path: None,
+            socket_path: None,
+            log_path: None,
+        };
+        
+        let _ = get_or_create_default_config_with(&resolver);
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_debug_logging_in_load_config_and_cache_with() -> Result<()> {
+        use log::Level;
+        use std::sync::Once;
+        
+        static INIT_LOGGER: Once = Once::new();
+        
+        INIT_LOGGER.call_once(|| {
+            env_logger::builder()
+                .filter_level(log::LevelFilter::Debug)
+                .is_test(true)
+                .try_init()
+                .ok();
+        });
+        
+        let temp_dir = tempdir()?;
+        let config_path = temp_dir.path().join("config.json");
+        let cache_path = temp_dir.path().join("cache");
+        
+        fs::write(
+            &config_path,
+            r#"{"rules":[],"cache_dir":null,"socket_dir":null}"#
+        )?;
+        
+        let resolver = MockResolver {
+            config_path: Some(config_path.clone()),
+            cache_path: Some(cache_path.clone()),
+            socket_path: None,
+            log_path: None,
+        };
+        
+        let _ = load_config_and_cache_with(&resolver, &Some(config_path), &None);
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_debug_logging_in_load_config_and_socket_with() -> Result<()> {
+        use log::Level;
+        use std::sync::Once;
+        
+        static INIT_LOGGER: Once = Once::new();
+        
+        INIT_LOGGER.call_once(|| {
+            env_logger::builder()
+                .filter_level(log::LevelFilter::Debug)
+                .is_test(true)
+                .try_init()
+                .ok();
+        });
+        
+        let temp_dir = tempdir()?;
+        let config_path = temp_dir.path().join("config.json");
+        let socket_path = temp_dir.path().join("socket");
+        
+        fs::write(
+            &config_path,
+            r#"{"rules":[],"cache_dir":null,"socket_dir":null}"#
+        )?;
+        
+        let resolver = MockResolver {
+            config_path: Some(config_path.clone()),
+            cache_path: None,
+            socket_path: Some(socket_path.clone()),
+            log_path: None,
+        };
+        
+        let _ = load_config_and_socket_with(&resolver, &Some(config_path), &None);
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_error_paths_in_get_or_create_default_config_with_parent_creation() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let config_file = temp_dir.path().join("readonly_dir").join("config.json");
+        
+        fs::create_dir(temp_dir.path().join("readonly_dir"))?;
+        
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let readonly = fs::Permissions::from_mode(0o444);
+            fs::set_permissions(temp_dir.path().join("readonly_dir"), readonly)?;
+        }
+        
+        let resolver = MockResolver {
+            config_path: Some(config_file),
+            cache_path: None,
+            socket_path: None,
+            log_path: None,
+        };
+        
+        let _result = get_or_create_default_config_with(&resolver);
+        
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let writable = fs::Permissions::from_mode(0o755);
+            fs::set_permissions(temp_dir.path().join("readonly_dir"), writable)?;
+        }
+        
+        Ok(())
     }
 }

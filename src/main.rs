@@ -1,5 +1,6 @@
 #![feature(test)]
 #![feature(thread_id_value)]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use crate::cli::execute;
 use std::path::PathBuf;
