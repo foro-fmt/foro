@@ -373,4 +373,101 @@ mod tests {
             _ => panic!("Expected a write command for `.rs`"),
         }
     }
+
+    #[test]
+    fn test_command_with_control_flow_if() {
+        let run_command = CommandWithControlFlow::Command(PureCommand::PluginUrl(
+            "https://example.com/plugin.dllpack".parse().unwrap(),
+        ));
+
+        let true_command = CommandWithControlFlow::Command(PureCommand::PluginUrl(
+            "https://example.com/true.dllpack".parse().unwrap(),
+        ));
+
+        let false_command = CommandWithControlFlow::Command(PureCommand::PluginUrl(
+            "https://example.com/false.dllpack".parse().unwrap(),
+        ));
+
+        let if_command = CommandWithControlFlow::If {
+            run: Box::new(run_command.clone()),
+            cond: "test_condition".to_string(),
+            on_true: Box::new(true_command.clone()),
+            on_false: Box::new(false_command.clone()),
+        };
+
+        match if_command {
+            CommandWithControlFlow::If { run, cond, on_true, on_false } => {
+                assert_eq!(cond, "test_condition");
+                match *run {
+                    CommandWithControlFlow::Command(_) => {},
+                    _ => panic!("Expected a Command variant"),
+                }
+                match *on_true {
+                    CommandWithControlFlow::Command(_) => {},
+                    _ => panic!("Expected a Command variant"),
+                }
+                match *on_false {
+                    CommandWithControlFlow::Command(_) => {},
+                    _ => panic!("Expected a Command variant"),
+                }
+            },
+            _ => panic!("Expected an If variant"),
+        }
+    }
+
+    #[test]
+    fn test_command_with_control_flow_sequential() {
+        let command1 = CommandWithControlFlow::Command(PureCommand::PluginUrl(
+            "https://example.com/plugin1.dllpack".parse().unwrap(),
+        ));
+
+        let command2 = CommandWithControlFlow::Command(PureCommand::PluginUrl(
+            "https://example.com/plugin2.dllpack".parse().unwrap(),
+        ));
+
+        let sequential = CommandWithControlFlow::Sequential(vec![command1, command2]);
+
+        match sequential {
+            CommandWithControlFlow::Sequential(commands) => {
+                assert_eq!(commands.len(), 2);
+            },
+            _ => panic!("Expected a Sequential variant"),
+        }
+    }
+
+    #[test]
+    fn test_command_with_control_flow_set() {
+        let mut vars = HashMap::new();
+        vars.insert("key1".to_string(), "value1".to_string());
+        vars.insert("key2".to_string(), "value2".to_string());
+
+        let set_command: CommandWithControlFlow<PureCommand> = CommandWithControlFlow::Set { set: vars.clone() };
+
+        match set_command {
+            CommandWithControlFlow::Set { set } => {
+                assert_eq!(set.len(), 2);
+                assert_eq!(set.get("key1"), Some(&"value1".to_string()));
+                assert_eq!(set.get("key2"), Some(&"value2".to_string()));
+            },
+            _ => panic!("Expected a Set variant"),
+        }
+    }
+
+    #[test]
+    fn test_load_str() {
+        let json = r#"{"rules":[],"cache_dir":"/cache","socket_dir":"/socket"}"#;
+        let config = load_str(json).expect("Should parse valid JSON");
+        
+        assert!(config.rules.is_empty());
+        assert_eq!(config.cache_dir, Some(PathBuf::from("/cache")));
+        assert_eq!(config.socket_dir, Some(PathBuf::from("/socket")));
+    }
+
+    #[test]
+    fn test_load_str_invalid_json() {
+        let invalid_json = r#"{"rules":[],"cache_dir":"/cache","socket_dir":}"#; // Syntax error
+        let result = load_str(invalid_json);
+        
+        assert!(result.is_err(), "Should fail with invalid JSON");
+    }
 }

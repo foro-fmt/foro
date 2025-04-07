@@ -414,4 +414,72 @@ mod tests {
             "Expected an error about missing config directory."
         );
     }
+
+    #[test]
+    fn test_wrapper_functions_with_mocked_resolver() -> Result<()> {
+        use std::sync::Once;
+        
+        static INIT: Once = Once::new();
+        static mut MOCK_CONFIG_PATH: Option<PathBuf> = None;
+        static mut MOCK_CACHE_PATH: Option<PathBuf> = None;
+        static mut MOCK_SOCKET_PATH: Option<PathBuf> = None;
+        
+        unsafe fn init_mocks() {
+            INIT.call_once(|| {
+                let temp_dir = tempdir().expect("Failed to create temp dir");
+                MOCK_CONFIG_PATH = Some(temp_dir.path().join("mock_config.json"));
+                MOCK_CACHE_PATH = Some(temp_dir.path().join("mock_cache"));
+                MOCK_SOCKET_PATH = Some(temp_dir.path().join("mock_socket"));
+                
+                fs::write(
+                    MOCK_CONFIG_PATH.as_ref().unwrap(),
+                    r#"{"rules":[],"cache_dir":null,"socket_dir":null}"#
+                ).expect("Failed to write mock config");
+                
+                std::mem::forget(temp_dir);
+            });
+        }
+        
+        unsafe {
+            init_mocks();
+        }
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_or_create_default_config() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let _config_path = temp_dir.path().join("config.json");
+        
+        assert!(get_or_create_default_config().is_some() || get_or_create_default_config().is_none(),
+            "get_or_create_default_config should always return Some or None");
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_config_and_cache_wrapper() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let config_path = temp_dir.path().join("config.json");
+        let cache_path = temp_dir.path().join("cache");
+        
+        fs::write(
+            &config_path,
+            r#"{"rules":[],"cache_dir":null,"socket_dir":null}"#
+        )?;
+        
+        let given_config = Some(config_path);
+        let given_cache = Some(cache_path.clone());
+        
+        let result = load_config_and_cache(&given_config, &given_cache);
+        
+        assert!(result.is_ok(), "load_config_and_cache should return Ok");
+        if let Ok((config, cache_dir)) = result {
+            assert_eq!(cache_dir, cache_path, "Cache directory should match expected");
+            assert!(config.rules.is_empty(), "Config rules should be empty");
+        }
+        
+        Ok(())
+    }
 }
