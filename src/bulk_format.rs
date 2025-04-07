@@ -5,6 +5,7 @@ use crate::handle_plugin::run::run;
 use crate::log::DAEMON_THREAD_START;
 use crate::path_utils::{normalize_path, to_wasm_path};
 use anyhow::{Context, Result};
+use foro_plugin_utils::data_json_utils::JsonGetter;
 use ignore::overrides::OverrideBuilder;
 use ignore::{WalkBuilder, WalkParallel, WalkState};
 use log::{debug, error, info, trace};
@@ -30,7 +31,8 @@ fn format_file(
     config: &Config,
     cache_path: &PathBuf,
     use_cache: bool,
-) -> Result<()> {
+) -> Result<bool> {
+    // Return type changed to bool: true indicates the file was changed
     info!("Formatting: {:?}", path);
 
     let rule = config
@@ -61,9 +63,20 @@ fn format_file(
     )?;
 
     debug_long!("{:?}", res);
-    info!("Success to format: {:?}", path);
 
-    Ok(())
+    let was_changed = if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
+        formatted != contents // Check if content has changed by comparing with original
+    } else {
+        false // Consider unchanged if no formatted content is available
+    };
+
+    info!(
+        "Success to format: {:?} ({})",
+        path,
+        if was_changed { "changed" } else { "unchanged" }
+    );
+
+    Ok(was_changed) // Return whether the file was changed
 }
 
 pub fn bulk_format(
@@ -71,7 +84,8 @@ pub fn bulk_format(
     config: &Config,
     cache_path: &PathBuf,
     use_cache: bool,
-) -> Result<usize> {
+) -> Result<(usize, usize)> {
+    // Returns (count of changed files, count of unchanged files)
     let (fst, rest) = opt.paths.split_first().context("No path given")?;
 
     let mut walk_builder = WalkBuilder::new(fst);
@@ -103,7 +117,8 @@ pub fn bulk_format(
     let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(|| Instant::now()));
 
     let formatting_threads = Arc::new(Mutex::new(Vec::new()));
-    let success_count = Arc::new(AtomicUsize::new(0));
+    let changed_count = Arc::new(AtomicUsize::new(0)); // Count of files that were changed
+    let unchanged_count = Arc::new(AtomicUsize::new(0)); // Count of files that were not changed
     let running_count = Arc::new(AtomicUsize::new(0));
 
     walk.run(|| {
@@ -113,7 +128,8 @@ pub fn bulk_format(
                     let opt = opt.clone();
                     let config = config.clone();
                     let cache_path = cache_path.clone();
-                    let success_count = success_count.clone();
+                    let changed_count = changed_count.clone();
+                    let unchanged_count = unchanged_count.clone();
                     let running_count = running_count.clone();
 
                     let path = dir_entry.path().to_path_buf();
@@ -144,8 +160,12 @@ pub fn bulk_format(
                         running_count.fetch_sub(1, Ordering::SeqCst);
 
                         match res {
-                            Ok(_) => {
-                                success_count.fetch_add(1, Ordering::SeqCst);
+                            Ok(was_changed) => {
+                                if was_changed {
+                                    changed_count.fetch_add(1, Ordering::SeqCst);
+                                } else {
+                                    unchanged_count.fetch_add(1, Ordering::SeqCst);
+                                }
                             }
                             Err(err) => {
                                 error!("Error formatting file: {}", err);
@@ -172,5 +192,8 @@ pub fn bulk_format(
         t.join().unwrap();
     }
 
-    Ok(success_count.load(Ordering::SeqCst))
+    Ok((
+        changed_count.load(Ordering::SeqCst),
+        unchanged_count.load(Ordering::SeqCst),
+    ))
 }

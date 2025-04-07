@@ -2,6 +2,7 @@ use crate::app_dir::{AppDirResolver, DefaultAppDirResolver};
 use crate::bulk_format::{bulk_format, BulkFormatOption};
 use crate::cli::GlobalOptions;
 use crate::config::load_config_and_cache;
+use crate::config::{Rule, SomeCommand};
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
     DaemonBulkFormatArgs, DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands,
@@ -33,7 +34,6 @@ use std::sync::{mpsc, OnceLock};
 use std::thread::sleep;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs, io, process, thread};
-use crate::config::{Rule, SomeCommand};
 
 static DAEMON_INFO: OnceLock<DaemonInfo> = OnceLock::new();
 
@@ -280,11 +280,22 @@ pub fn daemon_bulk_format_execute_with_args(
         current_dir,
     };
 
-    let success_count = bulk_format(&opt, &config, &cache_dir, !global_options.no_cache)?;
+    let (changed_count, unchanged_count) =
+        bulk_format(&opt, &config, &cache_dir, !global_options.no_cache)?;
+    let total_count = changed_count + unchanged_count;
 
-    Ok(DaemonBulkFormatResponse::Success(format!(
-        "Formated {success_count} files"
-    )))
+    let message = if changed_count > 0 {
+        format!(
+            "{} files processed. {} {} changed.",
+            total_count,
+            changed_count,
+            if changed_count == 1 { "file" } else { "files" }
+        )
+    } else {
+        format!("{} files processed. No files changed.", total_count)
+    };
+
+    Ok(DaemonBulkFormatResponse::Success(message))
 }
 
 pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse {
@@ -530,7 +541,7 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
             });
 
             setsid()?;
-            
+
             // todo: It is not good design to directly obtain log_dir here.
 
             let resolver = DefaultAppDirResolver {};

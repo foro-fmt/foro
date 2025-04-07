@@ -1,5 +1,5 @@
-mod model;
 mod load;
+mod model;
 
-pub use model::*;
 pub use load::*;
+pub use model::*;
