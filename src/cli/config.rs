@@ -6,7 +6,7 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 pub enum ConfigSubCommands {
     Path(ConfigPathArgs),
-    Cat(ConfigCatArgs),
+    Show(ConfigShowArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -19,12 +19,12 @@ pub struct ConfigArgs {
 pub struct ConfigPathArgs {}
 
 #[derive(Parser, Debug)]
-pub struct ConfigCatArgs {}
+pub struct ConfigShowArgs {}
 
 pub fn config_execute_with_args(args: ConfigArgs, global_options: GlobalOptions) -> Result<()> {
     match args.subcommand {
         ConfigSubCommands::Path(s_args) => config_path_execute_with_args(s_args, global_options),
-        ConfigSubCommands::Cat(s_args) => config_cat_execute_with_args(s_args, global_options),
+        ConfigSubCommands::Show(s_args) => config_show_execute_with_args(s_args, global_options),
     }
 }
 
@@ -42,8 +42,8 @@ pub fn config_path_execute_with_args(
     Ok(())
 }
 
-pub fn config_cat_execute_with_args(
-    _args: ConfigCatArgs,
+pub fn config_show_execute_with_args(
+    _args: ConfigShowArgs,
     global_options: GlobalOptions,
 ) -> Result<()> {
     let config_file = global_options
