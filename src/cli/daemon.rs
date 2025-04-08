@@ -22,7 +22,7 @@ pub fn daemon_start_execute_with_args(
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
-    if daemon_is_alive(&socket)?.0 {
+    if matches!(daemon_is_alive(&socket)?, DaemonStatus::Running(_)) {
         error!("Daemon is already running");
         return Ok(());
     }

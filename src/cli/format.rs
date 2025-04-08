@@ -70,7 +70,7 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
-    if !daemon_is_alive(&socket)?.0 {
+    if matches!(daemon_is_alive(&socket)?, DaemonStatus::NotRunning) {
         start_daemon(&socket, false)?;
     }
 
