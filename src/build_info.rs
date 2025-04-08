@@ -7,7 +7,11 @@ pub fn get_build_id() -> String {
     let target = built_info::TARGET;
     let profile = built_info::PROFILE;
     
-    let git_suffix = format!("-{}", built_info::RUSTC_VERSION.replace(" ", "_"));
+    let git_suffix = if let Some(git_version) = built_info::GIT_VERSION {
+        format!("-{}", git_version)
+    } else {
+        String::new()
+    };
     
     format!("{}{}-{}-{}", version, git_suffix, target, profile)
 }
