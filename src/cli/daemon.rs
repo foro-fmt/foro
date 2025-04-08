@@ -1,6 +1,6 @@
 use crate::cli::GlobalOptions;
 use crate::config::load_config_and_socket;
-use crate::daemon::client::{daemon_is_alive, run_command};
+use crate::daemon::client::{daemon_is_alive, run_command, DaemonStatus};
 use crate::daemon::interface::{DaemonCommands, DaemonSocketPath};
 use crate::daemon::server::start_daemon;
 use anyhow::Result;
@@ -22,7 +22,7 @@ pub fn daemon_start_execute_with_args(
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
-    if daemon_is_alive(&socket)? {
+    if matches!(daemon_is_alive(&socket)?, DaemonStatus::Running(_)) {
         error!("Daemon is already running");
         return Ok(());
     }

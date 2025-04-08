@@ -114,4 +114,5 @@ pub struct DaemonInfo {
     pub start_time: u64,
     pub stdout_path: OutputPath,
     pub stderr_path: OutputPath,
+    pub build_id: String,
 }

@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod app_dir;
+mod build_info;
 mod bulk_format;
 mod cli;
 mod config;

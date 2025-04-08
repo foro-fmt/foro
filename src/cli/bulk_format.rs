@@ -1,6 +1,6 @@
 use crate::cli::GlobalOptions;
 use crate::config::load_config_and_socket;
-use crate::daemon::client::{daemon_is_alive, run_command as daemon_run_command};
+use crate::daemon::client::{daemon_is_alive, run_command as daemon_run_command, DaemonStatus};
 use crate::daemon::interface::{DaemonBulkFormatArgs, DaemonCommands, DaemonSocketPath};
 use crate::daemon::server::start_daemon;
 use anyhow::Result;
@@ -26,9 +26,7 @@ pub fn bulk_format_execute_with_args(
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
-    if !daemon_is_alive(&socket)? {
-        start_daemon(&socket, false)?;
-    }
+    crate::daemon::client::ensure_daemon_running(&socket, &global_options)?;
 
     let threads = if args.threads == 0 {
         num_cpus::get()
@@ -43,7 +41,7 @@ pub fn bulk_format_execute_with_args(
         }),
         global_options,
         &socket,
-        false,
+        true,
     )?;
 
     Ok(())
