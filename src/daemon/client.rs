@@ -11,17 +11,18 @@ use std::env::current_dir;
 use std::io::{ErrorKind, Write};
 use std::time::Duration;
 
-fn parse_info(info_str: &str) -> Option<(u32, u64)> {
+fn parse_info(info_str: &str) -> Option<(u32, u64, String)> {
     let parts: Vec<&str> = info_str.split(',').collect();
 
-    if parts.len() != 2 {
+    if parts.len() < 3 {
         return None;
     }
 
     let pid = parts[0].parse().ok()?;
     let start_time = parts[1].parse().ok()?;
+    let build_id = parts[2..].join(",");
 
-    Some((pid, start_time))
+    Some((pid, start_time, build_id))
 }
 
 /// Check if the daemon is alive.
@@ -36,25 +37,25 @@ fn parse_info(info_str: &str) -> Option<(u32, u64)> {
 /// This is similar to [ping], but this function only determines whether the process is alive,
 /// whereas ping actually communicates and makes a determination.
 /// In other words, ping is more accurate but also slower.
-pub fn daemon_is_alive(socket: &DaemonSocketPath) -> Result<bool> {
+pub fn daemon_is_alive(socket: &DaemonSocketPath) -> Result<(bool, Option<String>)> {
     // note: don't call path.exits()
     //       because we can reduce the number of system calls and speed up (a little bit!)
     let content = match std::fs::read_to_string(&socket.info_path) {
         Ok(content) => content,
-        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(false),
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok((false, None)),
         Err(err) => return Err(err.into()),
     };
-    let (pid, start_time) = parse_info(&content).context("Failed to parse daemon info")?;
+    let (pid, start_time, build_id) = parse_info(&content).context("Failed to parse daemon info")?;
 
     if !is_alive(pid) {
-        return Ok(false);
+        return Ok((false, None));
     }
 
     if get_start_time(pid)? != start_time {
-        return Ok(false);
+        return Ok((false, None));
     }
 
-    Ok(true)
+    Ok((true, Some(build_id)))
 }
 
 /// Send a ping to the daemon.
@@ -135,64 +136,46 @@ pub fn run_command(
     socket: &DaemonSocketPath,
     check_alive: bool,
 ) -> Result<()> {
-    if check_alive && !daemon_is_alive(&socket)? {
-        match command {
-            DaemonCommands::Stop => {
-                // in rare cases, daemon_is_alive return false, but the process may still be alive
-                if !ping(&socket)? {
-                    info!("Daemon is not running");
-                    return Ok(());
-                }
-            }
-            _ => {
-                return Err(anyhow!("Daemon is not running!"));
-            }
-        }
-    }
-
-    if check_alive && matches!(command, DaemonCommands::Format(_) | DaemonCommands::PureFormat(_) | DaemonCommands::BulkFormat(_)) {
-        let current_build_id = crate::build_info::get_build_id();
+    if check_alive {
+        let (is_alive, daemon_build_id) = daemon_is_alive(&socket)?;
         
-        match UnixStream::connect(&socket.socket_path) {
-            Ok(stream) => {
-                match run_command_inner(
-                    DaemonCommands::Ping,
-                    GlobalOptions {
-                        config_file: None,
-                        cache_dir: None,
-                        socket_dir: None,
-                        no_cache: false,
-                        no_long_log: false,
-                        ignore_build_id_mismatch: false,
-                    },
-                    stream,
-                    Some(Duration::from_secs(1)),
-                ) {
-                    Ok(DaemonResponse::Pong(daemon_info)) => {
-                        if daemon_info.build_id != current_build_id {
-                            if global_options.ignore_build_id_mismatch {
-                                log::warn!("Daemon was built with a different build ID (daemon: {}, client: {}). Continuing without restart due to --ignore-build-id-mismatch flag.", 
-                                    daemon_info.build_id, current_build_id);
-                            } else {
-                                log::info!("Daemon was built with a different build ID (daemon: {}, client: {}). Restarting daemon.", 
-                                    daemon_info.build_id, current_build_id);
-                                
-                                let stop_stream = UnixStream::connect(&socket.socket_path)?;
-                                let _ = run_command_inner(
-                                    DaemonCommands::Stop,
-                                    global_options.clone(),
-                                    stop_stream,
-                                    None,
-                                )?;
-                                
-                                crate::daemon::server::start_daemon(&socket, false)?;
-                            }
-                        }
-                    },
-                    _ => {},
+        if !is_alive {
+            match command {
+                DaemonCommands::Stop => {
+                    // in rare cases, daemon_is_alive return false, but the process may still be alive
+                    if !ping(&socket)? {
+                        info!("Daemon is not running");
+                        return Ok(());
+                    }
                 }
-            },
-            Err(_) => {},
+                _ => {
+                    return Err(anyhow!("Daemon is not running!"));
+                }
+            }
+        } else if matches!(command, DaemonCommands::Format(_) | DaemonCommands::PureFormat(_) | DaemonCommands::BulkFormat(_)) {
+            let current_build_id = crate::build_info::get_build_id();
+            
+            if let Some(daemon_build_id) = daemon_build_id {
+                if daemon_build_id != current_build_id {
+                    if global_options.ignore_build_id_mismatch {
+                        log::warn!("Daemon was built with a different build ID (daemon: {}, client: {}). Continuing without restart due to --ignore-build-id-mismatch flag.", 
+                            daemon_build_id, current_build_id);
+                    } else {
+                        log::info!("Daemon was built with a different build ID (daemon: {}, client: {}). Restarting daemon.", 
+                            daemon_build_id, current_build_id);
+                        
+                        let stop_stream = UnixStream::connect(&socket.socket_path)?;
+                        let _ = run_command_inner(
+                            DaemonCommands::Stop,
+                            global_options.clone(),
+                            stop_stream,
+                            None,
+                        )?;
+                        
+                        crate::daemon::server::start_daemon(&socket, false)?;
+                    }
+                }
+            }
         }
     }
 

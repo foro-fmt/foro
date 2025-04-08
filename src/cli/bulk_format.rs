@@ -26,7 +26,7 @@ pub fn bulk_format_execute_with_args(
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
-    if !daemon_is_alive(&socket)? {
+    if !daemon_is_alive(&socket)?.0 {
         start_daemon(&socket, false)?;
     }
 

@@ -458,7 +458,8 @@ impl WrappedUnixSocket {
 
         let pid = process::id();
         let start_time = get_start_time(pid)?;
-        fs::write(&info_path, format!("{},{}", pid, start_time))?;
+        let build_id = crate::build_info::get_build_id();
+        fs::write(&info_path, format!("{},{},{}", pid, start_time, build_id))?;
 
         info!("Listening on: {}", path.display());
         info!("info path: {}", info_path.display());
