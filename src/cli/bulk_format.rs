@@ -26,10 +26,7 @@ pub fn bulk_format_execute_with_args(
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
-    let daemon_status = daemon_is_alive(&socket)?;
-    if matches!(daemon_status, DaemonStatus::NotRunning) {
-        start_daemon(&socket, false)?;
-    }
+    crate::daemon::client::ensure_daemon_running(&socket, &global_options)?;
 
     let threads = if args.threads == 0 {
         num_cpus::get()
@@ -44,7 +41,7 @@ pub fn bulk_format_execute_with_args(
         }),
         global_options,
         &socket,
-        Some(daemon_status),
+        true,
     )?;
 
     Ok(())

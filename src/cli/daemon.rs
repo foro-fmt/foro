@@ -59,7 +59,7 @@ pub fn daemon_restart_execute_with_args(
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
-    run_command(DaemonCommands::Stop, global_options, &socket, None)?;
+    run_command(DaemonCommands::Stop, global_options, &socket, true)?;
 
     start_daemon(&socket, args.attach)
 }
@@ -78,7 +78,7 @@ pub fn daemon_execute_with_args(args: DaemonArgs, global_options: GlobalOptions)
 
             let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
-            run_command(command, global_options, &socket, None)?;
+            run_command(command, global_options, &socket, true)?;
         }
     }
 
