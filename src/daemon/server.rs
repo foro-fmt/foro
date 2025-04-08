@@ -575,6 +575,7 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
                     start_time,
                     stdout_path: OutputPath::Path(log_dir.join("foro-stdout.log")),
                     stderr_path: OutputPath::Path(log_dir.join("foro.log")),
+                    build_id: crate::build_info::get_build_id(),
                 })
                 .unwrap();
 
@@ -663,6 +664,7 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
             start_time,
             stdout_path: OutputPath::Path(log_dir.join("foro-stdout.log")),
             stderr_path: OutputPath::Path(log_dir.join("foro.log")),
+            build_id: crate::build_info::get_build_id(),
         })
         .unwrap();
 
@@ -702,6 +704,7 @@ pub fn start_daemon(socket: &DaemonSocketPath, attach: bool) -> Result<()> {
                 start_time,
                 stdout_path: OutputPath::Attached,
                 stderr_path: OutputPath::Attached,
+                build_id: crate::build_info::get_build_id(),
             })
             .unwrap();
 

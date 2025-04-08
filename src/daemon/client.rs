@@ -71,6 +71,7 @@ pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
                     socket_dir: None,
                     no_cache: false,
                     no_long_log: false,
+                    ignore_build_id_mismatch: false,
                 },
                 stream,
                 Some(Duration::from_secs(1)),
@@ -149,6 +150,52 @@ pub fn run_command(
         }
     }
 
+    if check_alive && matches!(command, DaemonCommands::Format(_) | DaemonCommands::PureFormat(_) | DaemonCommands::BulkFormat(_)) {
+        let current_build_id = crate::build_info::get_build_id();
+        
+        match UnixStream::connect(&socket.socket_path) {
+            Ok(stream) => {
+                match run_command_inner(
+                    DaemonCommands::Ping,
+                    GlobalOptions {
+                        config_file: None,
+                        cache_dir: None,
+                        socket_dir: None,
+                        no_cache: false,
+                        no_long_log: false,
+                        ignore_build_id_mismatch: false,
+                    },
+                    stream,
+                    Some(Duration::from_secs(1)),
+                ) {
+                    Ok(DaemonResponse::Pong(daemon_info)) => {
+                        if daemon_info.build_id != current_build_id {
+                            if global_options.ignore_build_id_mismatch {
+                                log::warn!("Daemon was built with a different build ID (daemon: {}, client: {}). Continuing without restart due to --ignore-build-id-mismatch flag.", 
+                                    daemon_info.build_id, current_build_id);
+                            } else {
+                                log::info!("Daemon was built with a different build ID (daemon: {}, client: {}). Restarting daemon.", 
+                                    daemon_info.build_id, current_build_id);
+                                
+                                let stop_stream = UnixStream::connect(&socket.socket_path)?;
+                                let _ = run_command_inner(
+                                    DaemonCommands::Stop,
+                                    global_options.clone(),
+                                    stop_stream,
+                                    None,
+                                )?;
+                                
+                                crate::daemon::server::start_daemon(&socket, false)?;
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+            },
+            Err(_) => {},
+        }
+    }
+
     let stream = UnixStream::connect(&socket.socket_path)?;
 
     match run_command_inner(command, global_options, stream, None)? {
@@ -185,6 +232,7 @@ pub fn run_command(
             println!("daemon pid: {}", &info.pid);
             println!("daemon start time: {}", &info.start_time);
             println!("daemon log file: {}", &info.stderr_path);
+            println!("daemon build id: {}", &info.build_id);
         }
     }
 

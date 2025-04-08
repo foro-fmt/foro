@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 mod app_dir;
 mod bulk_format;
+mod build_info;
 mod cli;
 mod config;
 mod daemon;

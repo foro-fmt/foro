@@ -36,7 +36,7 @@ pub enum SubCommands {
     Internal(InternalArgs),
 }
 
-#[derive(Parser, Serialize, Deserialize, Debug)]
+#[derive(Parser, Serialize, Deserialize, Debug, Clone)]
 pub struct GlobalOptions {
     /// The path to an foro.json file to use for configuration
     #[arg(long, value_name = "PATH")]
@@ -57,6 +57,9 @@ pub struct GlobalOptions {
     /// Avoid logging log content
     #[arg(long, default_value = "false")]
     pub no_long_log: bool,
+    
+    #[arg(long, default_value = "false")]
+    pub ignore_build_id_mismatch: bool,
 }
 
 #[derive(Parser, Debug)]
