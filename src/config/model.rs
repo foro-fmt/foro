@@ -257,7 +257,7 @@ mod tests {
             "cache_dir": null,
             "socket_dir": null
         }"#;
-        
+
         let config: Config = serde_json::from_str(json).expect("Should parse valid JSON");
 
         let path_ts = PathBuf::from("app.ts");
@@ -299,7 +299,7 @@ mod tests {
             "cache_dir": "/custom/cache/foro",
             "socket_dir": null
         }"#;
-        
+
         let original_config: Config = serde_json::from_str(json).expect("Should parse valid JSON");
         let serialized = serde_json::to_string(&original_config).expect("Should serialize config");
         let deserialized: Config =
@@ -373,26 +373,31 @@ mod tests {
             "on_true": "https://example.com/true.dllpack",
             "on_false": "https://example.com/false.dllpack"
         }"#;
-        
-        let if_command: CommandWithControlFlow<PureCommand> = 
+
+        let if_command: CommandWithControlFlow<PureCommand> =
             serde_json::from_str(json).expect("Should parse valid JSON");
 
         match if_command {
-            CommandWithControlFlow::If { run, cond, on_true, on_false } => {
+            CommandWithControlFlow::If {
+                run,
+                cond,
+                on_true,
+                on_false,
+            } => {
                 assert_eq!(cond, "test_condition");
                 match *run {
-                    CommandWithControlFlow::Command(_) => {},
+                    CommandWithControlFlow::Command(_) => {}
                     _ => panic!("Expected a Command variant"),
                 }
                 match *on_true {
-                    CommandWithControlFlow::Command(_) => {},
+                    CommandWithControlFlow::Command(_) => {}
                     _ => panic!("Expected a Command variant"),
                 }
                 match *on_false {
-                    CommandWithControlFlow::Command(_) => {},
+                    CommandWithControlFlow::Command(_) => {}
                     _ => panic!("Expected a Command variant"),
                 }
-            },
+            }
             _ => panic!("Expected an If variant"),
         }
     }
@@ -403,14 +408,14 @@ mod tests {
             "https://example.com/plugin1.dllpack",
             "https://example.com/plugin2.dllpack"
         ]"#;
-        
-        let sequential: CommandWithControlFlow<PureCommand> = 
+
+        let sequential: CommandWithControlFlow<PureCommand> =
             serde_json::from_str(json).expect("Should parse valid JSON");
 
         match sequential {
             CommandWithControlFlow::Sequential(commands) => {
                 assert_eq!(commands.len(), 2);
-            },
+            }
             _ => panic!("Expected a Sequential variant"),
         }
     }
@@ -423,8 +428,8 @@ mod tests {
                 "key2": "value2"
             }
         }"#;
-        
-        let set_command: CommandWithControlFlow<PureCommand> = 
+
+        let set_command: CommandWithControlFlow<PureCommand> =
             serde_json::from_str(json).expect("Should parse valid JSON");
 
         match set_command {
@@ -432,7 +437,7 @@ mod tests {
                 assert_eq!(set.len(), 2);
                 assert_eq!(set.get("key1"), Some(&"value1".to_string()));
                 assert_eq!(set.get("key2"), Some(&"value2".to_string()));
-            },
+            }
             _ => panic!("Expected a Set variant"),
         }
     }
@@ -441,7 +446,7 @@ mod tests {
     fn test_load_str() {
         let json = r#"{"rules":[],"cache_dir":"/cache","socket_dir":"/socket"}"#;
         let config = load_str(json).expect("Should parse valid JSON");
-        
+
         assert!(config.rules.is_empty());
         assert_eq!(config.cache_dir, Some(PathBuf::from("/cache")));
         assert_eq!(config.socket_dir, Some(PathBuf::from("/socket")));
@@ -451,77 +456,84 @@ mod tests {
     fn test_load_str_invalid_json() {
         let invalid_json = r#"{"rules":[],"cache_dir":"/cache","socket_dir":}"#; // Syntax error
         let result = load_str(invalid_json);
-        
+
         assert!(result.is_err(), "Should fail with invalid JSON");
     }
-    
+
     #[test]
     fn test_load_file_nonexistent() {
         let nonexistent_path = PathBuf::from("/path/that/does/not/exist.json");
         let result = load_file(&nonexistent_path);
-        
+
         assert!(result.is_err(), "Should fail with nonexistent file");
-        assert!(result.unwrap_err().to_string().contains("Failed to open file"), 
-                "Error message should mention file opening failure");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to open file"),
+            "Error message should mention file opening failure"
+        );
     }
-    
+
     #[test]
     fn test_none_helper_function() {
         let result: Option<String> = none();
         assert!(result.is_none(), "none() should return None");
-        
+
         let result: Option<i32> = none();
         assert!(result.is_none(), "none() should return None for any type");
     }
-    
+
     #[test]
     fn test_pure_command_command_io() {
         let json = r#"{
             "io": "cat {{ input }} | grep pattern"
         }"#;
-        
+
         let command_io: PureCommand = serde_json::from_str(json).expect("Should parse valid JSON");
-        
+
         match command_io {
             PureCommand::CommandIO { io } => {
                 assert_eq!(io, "cat {{ input }} | grep pattern");
-            },
+            }
             _ => panic!("Expected CommandIO variant"),
         }
     }
-    
+
     #[test]
     fn test_write_command_variants() {
         let simple_cmd_json = r#""echo 'Hello World'""#;
-        
-        let simple_cmd: WriteCommand = serde_json::from_str(simple_cmd_json).expect("Should parse valid JSON");
+
+        let simple_cmd: WriteCommand =
+            serde_json::from_str(simple_cmd_json).expect("Should parse valid JSON");
         match simple_cmd {
             WriteCommand::SimpleCommand(cmd) => {
                 assert_eq!(cmd, "echo 'Hello World'");
-            },
+            }
             _ => panic!("Expected SimpleCommand variant"),
         }
-        
+
         let pure_cmd_json = r#""https://example.com/plugin.dllpack""#;
-        
-        let pure_cmd: WriteCommand = serde_json::from_str(pure_cmd_json).expect("Should parse valid JSON");
+
+        let pure_cmd: WriteCommand =
+            serde_json::from_str(pure_cmd_json).expect("Should parse valid JSON");
         match pure_cmd {
-            WriteCommand::Pure(_) => {},
+            WriteCommand::Pure(_) => {}
             _ => panic!("Expected Pure variant"),
         }
     }
-    
+
     #[test]
     fn test_load_file_invalid_content() {
-        use tempfile::tempdir;
         use std::io::Write;
-        
+        use tempfile::tempdir;
+
         let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("invalid.json");
-        
+
         let mut file = fs::File::create(&file_path).unwrap();
         file.write_all(b"{invalid json}").unwrap();
-        
+
         let result = load_file(&file_path);
         assert!(result.is_err(), "Should fail with invalid JSON content");
     }

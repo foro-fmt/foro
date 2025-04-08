@@ -57,7 +57,7 @@ pub struct GlobalOptions {
     /// Avoid logging log content
     #[arg(long, default_value = "false")]
     pub no_long_log: bool,
-    
+
     #[arg(long, default_value = "false")]
     pub ignore_build_id_mismatch: bool,
 }
