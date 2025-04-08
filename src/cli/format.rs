@@ -1,6 +1,6 @@
 use crate::cli::GlobalOptions;
 use crate::config::{load_config_and_cache, load_config_and_socket};
-use crate::daemon::client::{daemon_is_alive, run_command as daemon_run_command};
+use crate::daemon::client::{daemon_is_alive, run_command as daemon_run_command, DaemonStatus};
 use crate::daemon::interface::{DaemonCommands, DaemonFormatArgs, DaemonSocketPath};
 use crate::daemon::server::start_daemon;
 use crate::debug_long;
