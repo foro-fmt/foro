@@ -144,10 +144,10 @@ pub fn ensure_daemon_running(
             crate::daemon::server::start_daemon(&socket, false)?;
             Ok(daemon_is_alive(&socket)?)
         }
-        DaemonStatus::Running(daemon_build_id) => {
+        DaemonStatus::Running(ref daemon_build_id) => {
             let current_build_id = crate::build_info::get_build_id();
             
-            if daemon_build_id != current_build_id {
+            if daemon_build_id != &current_build_id {
                 if global_options.ignore_build_id_mismatch {
                     log::warn!("Daemon was built with a different build ID (daemon: {}, client: {}). Continuing without restart due to --ignore-build-id-mismatch flag.", 
                         daemon_build_id, current_build_id);
