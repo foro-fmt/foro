@@ -44,7 +44,7 @@ pub fn bulk_format_execute_with_args(
         }),
         global_options,
         &socket,
-        false,
+        Some(daemon_status),
     )?;
 
     Ok(())

@@ -79,7 +79,7 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
         DaemonCommands::Format(DaemonFormatArgs { path: args.path }),
         global_options,
         &socket,
-        false,
+        Some(daemon_status),
     )?;
 
     Ok(())
