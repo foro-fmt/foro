@@ -31,8 +31,8 @@ fn format_with_no_daemon(args: FormatArgs, global_options: GlobalOptions) -> Res
 
     let file = fs::File::open(&args.path)?;
     let mut buf_reader = io::BufReader::new(file);
-    let mut contents = String::new();
-    buf_reader.read_to_string(&mut contents)?;
+    let mut content = String::new();
+    buf_reader.read_to_string(&mut content)?;
 
     let rule = config
         .find_matched_rule(&target_path, false)
@@ -48,7 +48,7 @@ fn format_with_no_daemon(args: FormatArgs, global_options: GlobalOptions) -> Res
             "wasm-target": to_wasm_path(&target_path)?,
             "os-target":  normalize_path(&target_path)?,
             "raw-target": args.path,
-            "target-content": contents,
+            "target-content": content,
         }),
         &cache_dir,
         !global_options.no_cache,

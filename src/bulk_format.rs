@@ -43,8 +43,8 @@ fn format_file(
 
     let file = fs::File::open(&path)?;
     let mut buf_reader = io::BufReader::new(file);
-    let mut contents = String::new();
-    buf_reader.read_to_string(&mut contents)?;
+    let mut content = String::new();
+    buf_reader.read_to_string(&mut content)?;
 
     trace!("opened file: {:?}", path);
 
@@ -56,7 +56,7 @@ fn format_file(
             "wasm-target": to_wasm_path(&path)?,
             "os-target": normalize_path(&path)?,
             "raw-target": path,
-            "target-content": contents,
+            "target-content": content,
         }),
         cache_path,
         use_cache,
@@ -65,7 +65,7 @@ fn format_file(
     debug_long!("{:?}", res);
 
     let was_changed = if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
-        formatted != contents // Check if content has changed by comparing with original
+        formatted != content // Check if content has changed by comparing with original
     } else {
         false // Consider unchanged if no formatted content is available
     };
