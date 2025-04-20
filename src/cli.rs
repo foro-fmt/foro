@@ -40,26 +40,36 @@ pub enum SubCommands {
 pub struct GlobalOptions {
     /// The path to a foro.json file to use for configuration
     #[arg(long, value_name = "PATH", global = true)]
+    #[serde(default)]
     pub config_file: Option<PathBuf>,
 
     /// The path to directory to use for caching
     #[arg(long, value_name = "PATH", global = true)]
+    #[serde(default)]
     pub cache_dir: Option<PathBuf>,
 
     /// The path to directory to use for the daemon socket
     #[arg(long, value_name = "PATH", global = true)]
+    #[serde(default)]
     pub socket_dir: Option<PathBuf>,
 
     /// Avoid reading from or writing to the cache
     #[arg(long, default_value = "false", global = true)]
+    #[serde(default = "true_")]
     pub no_cache: bool,
 
     /// Avoid logging log content
     #[arg(long, default_value = "false", global = true)]
+    #[serde(default = "true_")]
     pub no_long_log: bool,
 
     #[arg(long, default_value = "false", global = true)]
+    #[serde(default = "true_")]
     pub ignore_build_id_mismatch: bool,
+}
+
+const fn true_() -> bool {
+    true
 }
 
 #[derive(Parser, Debug)]
