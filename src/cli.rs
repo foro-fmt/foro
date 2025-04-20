@@ -38,7 +38,7 @@ pub enum SubCommands {
 
 #[derive(Parser, Serialize, Deserialize, Debug, Clone)]
 pub struct GlobalOptions {
-    /// The path to an foro.json file to use for configuration
+    /// The path to a foro.json file to use for configuration
     #[arg(long, value_name = "PATH", global = true)]
     pub config_file: Option<PathBuf>,
 
