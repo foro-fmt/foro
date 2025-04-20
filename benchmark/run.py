@@ -84,6 +84,8 @@ def main() -> None:
                 "microsecond",
                 "--style",
                 "basic",
+                "--warmup",
+                "1",
                 *p_command,
             ]
 

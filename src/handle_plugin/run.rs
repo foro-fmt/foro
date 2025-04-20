@@ -152,7 +152,7 @@ fn run_plugin(
 
     if use_cache {
         return run_multi_cached(&setting.source, cache_path, |lib| {
-            run_plugin_inner(lib, cur_json.clone())
+            run_plugin_inner(lib, cur_json)
         });
     }
 
@@ -292,9 +292,10 @@ fn run_inner_write_command(
             Ok(json!({}))
         }
         WriteCommand::Pure(pure) => {
-            let res = run_inner_pure_command(pure, cur_json.clone(), cache_path, use_cache)?;
-
             let target_path = String::get_value(&cur_json, ["os-target"])?;
+
+            let res = run_inner_pure_command(pure, cur_json, cache_path, use_cache)?;
+
             if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
                 fs::write(target_path, formatted)?;
             }
@@ -403,24 +404,15 @@ pub fn run(
     let res = match some_command {
         SomeCommand::Pure { cmd } => {
             let target_path = String::get_value(&cur_json, ["os-target"])?;
+            let original_content = String::get_value(&cur_json, ["target-content"])?;
 
-            let cur_json_clone = cur_json.clone();
-            let res = run_flow(
-                cmd,
-                run_inner_pure_command,
-                cur_json_clone,
-                cache_path,
-                use_cache,
-            )?;
+            let res = run_flow(cmd, run_inner_pure_command, cur_json, cache_path, use_cache)?;
 
             if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
-                let original_content = String::get_value(&cur_json, ["target-content"])?;
-
                 if formatted != original_content {
                     fs::write(target_path, formatted)?;
                 }
             }
-
             res
         }
         SomeCommand::Write { write_cmd } => {

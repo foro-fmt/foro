@@ -1,12 +1,14 @@
+use crate::build_info::get_build_id;
 use crate::cli::GlobalOptions;
 use crate::daemon::interface::{
     DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands, DaemonFormatResponse,
     DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath,
 };
+use crate::daemon::server::start_daemon;
 use crate::daemon::uds::UnixStream;
 use crate::process_utils::{get_start_time, is_alive};
 use anyhow::{anyhow, Context, Result};
-use log::{debug, info};
+use log::{debug, info, warn};
 use std::env::current_dir;
 use std::io::{ErrorKind, Write};
 use std::time::Duration;
@@ -141,18 +143,18 @@ pub fn ensure_daemon_running(
 
     match status {
         DaemonStatus::NotRunning => {
-            crate::daemon::server::start_daemon(&socket, false)?;
+            start_daemon(&socket, false)?;
             Ok(daemon_is_alive(&socket)?)
         }
         DaemonStatus::Running(ref daemon_build_id) => {
-            let current_build_id = crate::build_info::get_build_id();
+            let current_build_id = get_build_id();
 
             if daemon_build_id != &current_build_id {
                 if global_options.ignore_build_id_mismatch {
-                    log::warn!("Daemon was built with a different build ID (daemon: {}, client: {}). Continuing without restart due to --ignore-build-id-mismatch flag.", 
+                    warn!("Daemon was built with a different build ID (daemon: {}, client: {}). Continuing without restart due to --ignore-build-id-mismatch flag.", 
                         daemon_build_id, current_build_id);
                 } else {
-                    log::info!("Daemon was built with a different build ID (daemon: {}, client: {}). Restarting daemon.", 
+                    info!("Daemon was built with a different build ID (daemon: {}, client: {}). Restarting daemon.", 
                         daemon_build_id, current_build_id);
 
                     let stop_stream = UnixStream::connect(&socket.socket_path)?;
@@ -163,7 +165,7 @@ pub fn ensure_daemon_running(
                         None,
                     )?;
 
-                    crate::daemon::server::start_daemon(&socket, false)?;
+                    start_daemon(&socket, false)?;
                     return Ok(daemon_is_alive(&socket)?);
                 }
             }
