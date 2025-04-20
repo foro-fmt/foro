@@ -1,5 +1,6 @@
 [package]
 name = "foro"
+repository = "https://github.com/nahco314/foro"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,6 +10,10 @@ opt-level = 3
 codegen-units = 1
 debug = false
 lto = "fat"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "super-release"
 
 [dependencies]
 anyhow = "1.0.86"
