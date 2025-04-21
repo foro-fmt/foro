@@ -152,7 +152,7 @@ fn run_plugin(
 
     if use_cache {
         return run_multi_cached(&setting.source, cache_path, |lib| {
-            run_plugin_inner(lib, cur_json)
+            run_plugin_inner(lib, cur_json.clone())
         });
     }
 
