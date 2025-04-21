@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::daemon::interface::DaemonFormatResponse;
 use crate::debug_long;
 use crate::handle_plugin::run::run;
 use crate::log::DAEMON_THREAD_START;
@@ -7,8 +6,8 @@ use crate::path_utils::{normalize_path, to_wasm_path};
 use anyhow::{Context, Result};
 use foro_plugin_utils::data_json_utils::JsonGetter;
 use ignore::overrides::OverrideBuilder;
-use ignore::{WalkBuilder, WalkParallel, WalkState};
-use log::{debug, error, info, trace};
+use ignore::{WalkBuilder, WalkState};
+use log::{error, info, trace};
 use serde_json::json;
 use std::io::Read;
 use std::path::PathBuf;

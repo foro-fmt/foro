@@ -22,7 +22,6 @@ use foro_plugin_utils::data_json_utils::JsonGetter;
 use log::{debug, error, info, trace, warn};
 use notify::Watcher;
 use serde_json::json;
-use std::fmt::format;
 use std::fs::{DirBuilder, OpenOptions};
 use std::io::prelude::*;
 use std::io::{ErrorKind, Read};

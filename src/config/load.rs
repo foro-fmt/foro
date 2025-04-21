@@ -2,10 +2,9 @@ use crate::app_dir::{AppDirResolver, DefaultAppDirResolver};
 use crate::config::load_file;
 use crate::config::model::Config;
 use crate::debug_long;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use log::{debug, info};
 use std::fs;
-use std::io::Read;
 use std::path::PathBuf;
 
 // functions that manually inject resolvers
@@ -651,7 +650,6 @@ mod tests {
 
     #[test]
     fn test_debug_logging_in_get_or_create_default_config_with() -> Result<()> {
-        use log::Level;
         use std::sync::Once;
 
         static INIT_LOGGER: Once = Once::new();
@@ -681,7 +679,6 @@ mod tests {
 
     #[test]
     fn test_debug_logging_in_load_config_and_cache_with() -> Result<()> {
-        use log::Level;
         use std::sync::Once;
 
         static INIT_LOGGER: Once = Once::new();
@@ -717,7 +714,6 @@ mod tests {
 
     #[test]
     fn test_debug_logging_in_load_config_and_socket_with() -> Result<()> {
-        use log::Level;
         use std::sync::Once;
 
         static INIT_LOGGER: Once = Once::new();

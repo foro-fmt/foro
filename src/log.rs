@@ -6,7 +6,7 @@ use log::LevelFilter;
 use std::cell::OnceCell;
 use std::io::{Result as IOResult, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, LazyLock, Mutex, Once, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use std::time::Instant;
 
 pub static IS_DAEMON_PROCESS: AtomicBool = AtomicBool::new(false);
@@ -161,14 +161,12 @@ macro_rules! trace_long {
 mod tests {
     use super::*;
     use ctor::ctor;
-    use env_logger::{Builder, Target};
+
     use log::{debug, LevelFilter};
     use regex::Regex;
     use serial_test::serial;
-    use std::cell::LazyCell;
-    use std::sync::Once;
+
     use std::thread;
-    use std::thread::sleep;
 
     // If you do not initialize the logger at the start of the process, the log macro will be
     // executed first by other unit tests, making it impossible to set the logger.

@@ -17,7 +17,7 @@ pub use on_windows::*;
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_is_alive() {
         let my_pid = std::process::id();

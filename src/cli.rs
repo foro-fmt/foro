@@ -1,17 +1,13 @@
 use anyhow::Result;
 use clap::Parser;
 use clap_verbosity_flag::InfoLevel;
-use std::cell::OnceCell;
-use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
 
 mod bulk_format;
 mod cache;
 mod config;
 mod daemon;
-pub mod format;
+mod format;
 mod internal;
 
 use format::*;
@@ -21,7 +17,7 @@ use crate::cli::cache::{cache_execute_with_args, CacheArgs};
 use crate::cli::config::{config_execute_with_args, ConfigArgs};
 use crate::cli::daemon::{daemon_execute_with_args, DaemonArgs};
 use crate::cli::internal::{internal_execute_with_args, InternalArgs};
-use crate::log::{init_env_logger, DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD, IS_DAEMON_PROCESS};
+use crate::log::init_env_logger;
 use log::trace;
 use serde::{Deserialize, Serialize};
 

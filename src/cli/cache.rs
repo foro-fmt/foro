@@ -1,19 +1,13 @@
 use crate::cli::GlobalOptions;
-use crate::config::{load_config_and_cache, load_config_and_socket};
-use crate::daemon::client::run_command;
-use crate::daemon::interface::{DaemonCommands, DaemonSocketPath};
+use crate::config::load_config_and_cache;
 use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
 use dll_pack::resolve::get_all_cached_dependencies;
 use log::{debug, error, info};
-use minijinja::functions::debug;
 use std::fs;
-use std::path::PathBuf;
 use std::str::FromStr;
-use std::thread::sleep;
-use std::time::Duration;
 use url::Url;
 
 #[derive(Parser, Debug)]

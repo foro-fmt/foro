@@ -64,3 +64,6 @@ tempfile = "3.17.1"
 
 [build-dependencies]
 built = "0.7.7"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }

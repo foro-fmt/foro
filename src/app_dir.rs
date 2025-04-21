@@ -8,6 +8,7 @@ mod windows_resolver;
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 pub(crate) trait AppDirResolver {
     fn config_file(&self) -> Option<PathBuf>;
     fn cache_dir(&self) -> Option<PathBuf>;
