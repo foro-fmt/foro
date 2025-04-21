@@ -57,6 +57,9 @@ uds_windows = "1.1.0"
 winapi = { version = "0.3", features = ["winbase", "minwindef", "winnt", "processthreadsapi", "processenv"] }
 
 [dev-dependencies]
+ctor = "0.4.1"
+regex = "1.11.1"
+serial_test = "3.2.0"
 tempfile = "3.17.1"
 
 [build-dependencies]

@@ -88,6 +88,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
     init_env_logger(
         args.verbose.log_level_filter(),
         args.global_options.no_long_log,
+        None,
     );
 
     trace!("start foro: {:?}", &args);

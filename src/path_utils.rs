@@ -68,7 +68,8 @@ pub fn to_wasm_path(path: &PathBuf) -> Result<String> {
 }
 
 #[cfg(test)]
-mod test {
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
     use super::*;
 
     #[test]
@@ -87,7 +88,7 @@ mod test {
         );
     }
 
-    #[cfg_attr(unix, ignore)]
+    #[cfg_attr(not(windows), ignore)]
     #[test]
     fn test_normalize_path_windows() {
         assert_eq!(
@@ -96,12 +97,30 @@ mod test {
         );
     }
 
-    #[cfg_attr(unix, ignore)]
+    #[cfg_attr(not(windows), ignore)]
     #[test]
     fn test_to_wasm_path_windows() {
         assert_eq!(
             to_wasm_path(&PathBuf::from(r"C:\Users\test")).unwrap(),
             r"/c/Users/test"
         );
+    }
+
+    #[cfg_attr(not(unix), ignore)]
+    #[test]
+    fn test_normalize_path_unix() {
+        let pwd = std::env::current_dir().unwrap();
+        let pwd_str = pwd.to_str().unwrap();
+
+        assert_eq!(normalize_path(&pwd).unwrap(), pwd_str);
+    }
+
+    #[cfg_attr(not(unix), ignore)]
+    #[test]
+    fn test_to_wasm_path_unix() {
+        let pwd = std::env::current_dir().unwrap();
+        let pwd_str = pwd.to_str().unwrap();
+
+        assert_eq!(to_wasm_path(&pwd).unwrap(), pwd_str);
     }
 }
