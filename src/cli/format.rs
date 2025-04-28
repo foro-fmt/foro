@@ -1,18 +1,10 @@
 use crate::cli::GlobalOptions;
-use crate::config::{load_config_and_cache, load_config_and_socket};
+use crate::config::load_config_and_socket;
 use crate::daemon::client::{ensure_daemon_running, run_command as daemon_run_command};
 use crate::daemon::interface::{DaemonCommands, DaemonFormatArgs, DaemonSocketPath};
-use crate::debug_long;
-use crate::handle_plugin::run::run;
-use crate::path_utils::{normalize_path, to_wasm_path};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
-use log::info;
-use serde_json::json;
-use std::env::current_dir;
-use std::io::Read;
 use std::path::PathBuf;
-use std::{fs, io};
 
 #[derive(Parser, Debug)]
 pub struct FormatArgs {
