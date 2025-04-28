@@ -54,10 +54,9 @@ pub struct GlobalOptions {
     #[serde(default = "true_")]
     pub no_cache: bool,
 
-    /// Avoid logging log content
     #[arg(long, default_value = "false", global = true)]
-    #[serde(default = "true_")]
-    pub no_long_log: bool,
+    #[serde(default = "false_")]
+    pub long_log: bool,
 
     #[arg(long, default_value = "false", global = true)]
     #[serde(default = "true_")]
@@ -66,6 +65,10 @@ pub struct GlobalOptions {
 
 const fn true_() -> bool {
     true
+}
+
+const fn false_() -> bool {
+    false
 }
 
 #[derive(Parser, Debug)]
@@ -83,7 +86,7 @@ pub struct Command {
 pub fn execute_with_args(args: Command) -> Result<()> {
     init_env_logger(
         args.verbose.log_level_filter(),
-        args.global_options.no_long_log,
+        !args.global_options.long_log,
         None,
     );
 
