@@ -80,7 +80,7 @@ pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
                     cache_dir: None,
                     socket_dir: None,
                     no_cache: false,
-                    no_long_log: false,
+                    long_log: false,
                     ignore_build_id_mismatch: false,
                 },
                 stream,
