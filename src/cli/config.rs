@@ -7,6 +7,7 @@ use clap::Parser;
 pub enum ConfigSubCommands {
     Path(ConfigPathArgs),
     Show(ConfigShowArgs),
+    Default(ConfigDefaultArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -21,10 +22,14 @@ pub struct ConfigPathArgs {}
 #[derive(Parser, Debug)]
 pub struct ConfigShowArgs {}
 
+#[derive(Parser, Debug)]
+pub struct ConfigDefaultArgs {}
+
 pub fn config_execute_with_args(args: ConfigArgs, global_options: GlobalOptions) -> Result<()> {
     match args.subcommand {
         ConfigSubCommands::Path(s_args) => config_path_execute_with_args(s_args, global_options),
         ConfigSubCommands::Show(s_args) => config_show_execute_with_args(s_args, global_options),
+        ConfigSubCommands::Default(s_args) => config_default_execute_with_args(s_args, global_options),
     }
 }
 
@@ -56,5 +61,14 @@ pub fn config_show_execute_with_args(
 
     println!("{}", content);
 
+    Ok(())
+}
+
+pub fn config_default_execute_with_args(
+    _args: ConfigDefaultArgs,
+    _global_options: GlobalOptions,
+) -> Result<()> {
+    let default_config = include_str!("../config/default_config.json");
+    println!("{}", default_config);
     Ok(())
 }
