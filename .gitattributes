@@ -1,1 +1,2 @@
 benchmark/*/** linguist-vendored
+tests/fixtures/ linguist-vendored

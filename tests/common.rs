@@ -1,7 +1,7 @@
 use assert_cmd::prelude::*;
 use assert_fs::fixture::ChildPath;
 use assert_fs::prelude::*;
-use std::{fs};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -17,7 +17,7 @@ impl Cache {
             Cache::GlobalCache => PathBuf::from(env!("TARGET_DIR")).join("foro-test-cache"),
         }
     }
-    
+
     pub fn ensure_dir(&self) {
         if !self.path().exists() {
             fs::create_dir_all(self.path()).unwrap();
@@ -39,9 +39,9 @@ impl CacheKind {
     }
 }
 
-
 pub struct TestEnv {
     temp_dir: assert_fs::TempDir,
+    pub work_dir: ChildPath,
     pub config_file: ChildPath,
     pub cache: Cache,
     pub socket_dir: ChildPath,
@@ -74,6 +74,17 @@ impl TestEnv {
         self.child(path).path().to_path_buf()
     }
 
+    pub fn assert_eq<P: AsRef<Path>>(&self, actual: P, expected: P) {
+        let actual = String::from_utf8(fs::read(self.child(actual)).unwrap()).unwrap();
+        let expected = String::from_utf8(fs::read(self.child(expected)).unwrap()).unwrap();
+
+        assert_eq!(
+            actual, expected,
+            "\nactual:\n{}\n\n-------------\nexpected:\n{}",
+            actual, expected
+        );
+    }
+
     pub fn build_option(&self) -> Vec<String> {
         let mut args = Vec::new();
         args.push("--config-file".to_string());
@@ -87,12 +98,12 @@ impl TestEnv {
 
     pub fn raw_foro(&self, args: &[&str]) -> Command {
         let mut cmd = Command::cargo_bin("foro").unwrap();
-        cmd.current_dir(self.temp_dir.path());
+        cmd.current_dir(self.work_dir.path());
         cmd.args(args);
 
         cmd
     }
-    
+
     pub fn foro_cmd(&self, args: &[&str]) -> Command {
         let mut args: Vec<_> = args.to_vec();
         let options = self.build_option();
@@ -109,8 +120,15 @@ impl TestEnv {
     }
 }
 
+impl Drop for TestEnv {
+    fn drop(&mut self) {
+        self.foro(&["daemon", "stop"]);
+    }
+}
+
 pub struct TestEnvBuilder {
     fixture_path: PathBuf,
+    work_dir: Option<PathBuf>,
     config_file: Option<PathBuf>,
     cache: Option<CacheKind>,
     socket_dir: Option<PathBuf>,
@@ -120,10 +138,16 @@ impl TestEnvBuilder {
     pub fn new<P: AsRef<Path>>(fixture_path: P) -> Self {
         TestEnvBuilder {
             fixture_path: fixture_path.as_ref().to_path_buf(),
+            work_dir: None,
             config_file: None,
             cache: None,
             socket_dir: None,
         }
+    }
+    
+    pub fn work_dir<P: AsRef<Path>>(mut self, work_dir: P) -> Self {
+        self.work_dir = Some(work_dir.as_ref().to_path_buf());
+        self
     }
 
     pub fn config_file<P: AsRef<Path>>(mut self, config_file: P) -> Self {
@@ -135,7 +159,7 @@ impl TestEnvBuilder {
         self.cache = Some(CacheKind::TempCache(cache_dir.as_ref().to_path_buf()));
         self
     }
-    
+
     pub fn global_cache(mut self) -> Self {
         self.cache = Some(CacheKind::GlobalCache);
         self
@@ -145,17 +169,22 @@ impl TestEnvBuilder {
         self.socket_dir = Some(socket_dir.as_ref().to_path_buf());
         self
     }
-    
+
     pub fn build(self) -> TestEnv {
         let temp_dir = assert_fs::TempDir::new().unwrap();
-        temp_dir.copy_from(self.fixture_path, &["*"]).unwrap();
+        temp_dir.copy_from(self.fixture_path, &["**"]).unwrap();
 
+        let work_dir = temp_dir.child(self.work_dir.unwrap_or(PathBuf::from(".")));
         let config_file = temp_dir.child(self.config_file.unwrap_or(PathBuf::from("foro.json")));
-        let cache = self.cache.unwrap_or(CacheKind::GlobalCache).build(&temp_dir);
+        let cache = self
+            .cache
+            .unwrap_or(CacheKind::GlobalCache)
+            .build(&temp_dir);
         let socket_dir = temp_dir.child(self.socket_dir.unwrap_or(PathBuf::from("socket")));
 
         let res = TestEnv {
             temp_dir,
+            work_dir,
             config_file,
             cache,
             socket_dir,
