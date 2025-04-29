@@ -196,7 +196,7 @@ fn run_inner_pure_command(
                 let (exec, args) = words.split_first().context("Empty command")?;
                 let _target_path = String::get_value(&cur_json, ["os-target"])?;
                 let target_content = String::get_value(&cur_json, ["target-content"])?;
-                let current_dir = String::get_value(&cur_json, ["current-dir"])?;
+                let current_dir = String::get_value(&cur_json, ["os-current-dir"])?;
 
                 debug_long!(
                     "exec: {:?}, args: {:?}, current_dir: {:?}",
@@ -213,7 +213,7 @@ fn run_inner_pure_command(
                     .spawn()
                     .context("Failed to execute command")?;
 
-                trace!("spawned",);
+                trace!("spawned");
 
                 let mut stdin = child.stdin.take().unwrap();
 
@@ -221,7 +221,7 @@ fn run_inner_pure_command(
 
                 drop(stdin);
 
-                trace!("writed");
+                trace!("wrote");
 
                 let exit_status = child.wait()?;
 
@@ -268,7 +268,7 @@ fn run_inner_write_command(
             let words = winsplit::split(&rendered_cmd);
 
             let (exec, args) = words.split_first().context("Empty command")?;
-            let current_dir = String::get_value(&cur_json, ["current-dir"])?;
+            let current_dir = String::get_value(&cur_json, ["os-current-dir"])?;
 
             debug_long!(
                 "exec: {:?}, args: {:?}, current_dir: {:?}",
