@@ -525,6 +525,11 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
         ForkResult::Parent { child: _child } => {
             info!("Daemon started");
 
+            // If parent holds writer, even if child terminates with an error,
+            // reader.read will not return Err and will hang indefinitely.
+            // Therefore, it is immediately dropped.
+            drop(writer);
+
             let mut buf = [0];
             match reader.read(buf.as_mut_slice()) {
                 Ok(_) => Ok(()),
@@ -535,6 +540,8 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
             }
         }
         ForkResult::Child => {
+            drop(reader); // same as above
+
             IS_DAEMON_PROCESS.store(true, Ordering::SeqCst);
             IS_DAEMON_MAIN_THREAD.with(|is_main_thread| {
                 let _ = is_main_thread.set(true);
