@@ -56,6 +56,46 @@ fn test_cli_format_cpp() {
 }
 
 #[test]
+fn test_cli_format_cpp_ignore() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_cpp/ignore/");
+
+    env.foro(&["format", "./main.cpp"]);
+    env.assert_eq("main.cpp", "expected.cpp");
+}
+
+#[test]
+fn test_cli_format_cpp_with_config() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_cpp/with_config/");
+
+    env.foro(&["format", "./main.cpp"]);
+    env.assert_eq("main.cpp", "expected.cpp");
+}
+
+#[test]
+fn test_cli_format_cpp_disable() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_cpp/disable/");
+
+    env.foro(&["format", "./main.cpp"]);
+    env.assert_eq("main.cpp", "expected.cpp");
+}
+
+#[test]
+fn test_cli_format_cpp_nested_config() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_cpp/nested_config/");
+
+    env.foro(&["format", "./nest/src/main.cpp"]);
+    env.assert_eq("nest/src/main.cpp", "nest/src/expected.cpp");
+}
+
+#[test]
+fn test_cli_format_cpp_overwrite_config() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_cpp/overwrite_config/");
+
+    env.foro(&["format", "./src/main.cpp"]);
+    env.assert_eq("src/main.cpp", "src/expected.cpp");
+}
+
+#[test]
 fn test_cli_format_go() {
     let env = TestEnv::new("./tests/fixtures/cli_format_go/basic/");
 
