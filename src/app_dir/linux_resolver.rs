@@ -17,9 +17,14 @@ impl AppDirResolver for LinuxAppDirResolver {
     }
 
     fn socket_dir(&self) -> Option<PathBuf> {
-        let mut a = dirs::runtime_dir()?;
-        a.push("foro");
-        Some(a)
+        if let Some(mut a) = dirs::runtime_dir() {
+            a.push("foro");
+            Some(a)
+        } else {
+            let mut a = dirs::config_dir()?;
+            a.push("foro-socket-tmp/foro");
+            Some(a)
+        }
     }
 
     fn log_dir(&self) -> Option<PathBuf> {
