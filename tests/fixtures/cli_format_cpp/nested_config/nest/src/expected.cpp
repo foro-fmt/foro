@@ -1,9 +1,9 @@
 #include <iostream>
 int main()
 {
-    if (true)
-    {
-        std::cout << "Hello, world!\n";
-    }
-    return 0;
+  if (true)
+  {
+    std::cout << "Hello, world!\n";
+  }
+  return 0;
 }
