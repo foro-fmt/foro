@@ -144,7 +144,7 @@ impl TestEnvBuilder {
             socket_dir: None,
         }
     }
-    
+
     pub fn work_dir<P: AsRef<Path>>(mut self, work_dir: P) -> Self {
         self.work_dir = Some(work_dir.as_ref().to_path_buf());
         self

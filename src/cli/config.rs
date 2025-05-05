@@ -29,7 +29,9 @@ pub fn config_execute_with_args(args: ConfigArgs, global_options: GlobalOptions)
     match args.subcommand {
         ConfigSubCommands::Path(s_args) => config_path_execute_with_args(s_args, global_options),
         ConfigSubCommands::Show(s_args) => config_show_execute_with_args(s_args, global_options),
-        ConfigSubCommands::Default(s_args) => config_default_execute_with_args(s_args, global_options),
+        ConfigSubCommands::Default(s_args) => {
+            config_default_execute_with_args(s_args, global_options)
+        }
     }
 }
 
