@@ -127,6 +127,44 @@ fn test_cli_format_python() {
 }
 
 #[test]
+fn test_cli_format_python_ignore() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_python/ignore/");
+    env.foro(&["format", "./main.py"]);
+    env.assert_eq("main.py", "expected.py");
+}
+
+#[test]
+fn test_cli_format_python_with_config() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_python/with_config/");
+    env.foro(&["format", "./main.py"]);
+    env.assert_eq("main.py", "expected.py");
+}
+
+#[test]
+fn test_cli_format_python_nested_config() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_python/nested_config/");
+    env.foro(&["format", "./nest/src/main.py"]);
+    env.assert_eq("nest/src/main.py", "nest/src/expected.py");
+}
+
+#[test]
+fn test_cli_format_python_overwrite_config() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_python/overwrite_config/");
+    env.foro(&["format", "./src/main.py"]);
+    env.assert_eq("src/main.py", "src/expected.py");
+}
+
+#[test]
+fn test_cli_format_python_extend_config() {
+    let env = TestEnvBuilder::new("./tests/fixtures/cli_format_python/extend_config/")
+        .work_dir("./root/")
+        .build();
+
+    env.foro(&["format", "./main.py"]);
+    env.assert_eq("root/main.py", "root/expected.py");
+}
+
+#[test]
 fn test_cli_format_rules() {
     let env = TestEnv::new("./tests/fixtures/cli_format_rules/");
 

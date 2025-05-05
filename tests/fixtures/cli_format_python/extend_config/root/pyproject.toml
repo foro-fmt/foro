@@ -1,0 +1,6 @@
+[tool.ruff]
+extend = "../pyproject.toml"
+indent-width = 8
+
+[tool.ruff.format]
+indent-style = "space"

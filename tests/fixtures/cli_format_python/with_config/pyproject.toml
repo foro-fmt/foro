@@ -1,0 +1,5 @@
+[tool.ruff]
+indent-width = 8
+
+[tool.ruff.format]
+quote-style = "single"
