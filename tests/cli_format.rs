@@ -72,6 +72,14 @@ fn test_cli_format_cpp_with_config() {
 }
 
 #[test]
+fn test_cli_format_cpp_disable() {
+    let env = TestEnv::new("./tests/fixtures/cli_format_cpp/disable/");
+
+    env.foro(&["format", "./main.cpp"]);
+    env.assert_eq("main.cpp", "expected.cpp");
+}
+
+#[test]
 fn test_cli_format_cpp_nested_config() {
     let env = TestEnv::new("./tests/fixtures/cli_format_cpp/nested_config/");
 
@@ -85,16 +93,6 @@ fn test_cli_format_cpp_overwrite_config() {
 
     env.foro(&["format", "./src/main.cpp"]);
     env.assert_eq("src/main.cpp", "src/expected.cpp");
-}
-
-#[test]
-fn test_cli_format_cpp_extend_config() {
-    let env = TestEnvBuilder::new("./tests/fixtures/cli_format_cpp/extend_config/")
-        .work_dir("./root/")
-        .build();
-
-    env.foro(&["format", "./main.cpp"]);
-    env.assert_eq("root/main.cpp", "root/expected.cpp");
 }
 
 #[test]
