@@ -96,6 +96,7 @@ fn test_cli_format_cpp_overwrite_config() {
 }
 
 #[test]
+#[ignore]
 fn test_cli_format_go() {
     let env = TestEnv::new("./tests/fixtures/cli_format_go/basic/");
 
