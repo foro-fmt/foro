@@ -147,7 +147,7 @@ fn write_lock_metadata(lock: &mut FileLock) -> Result<()> {
     let timestamp = since_epoch.as_secs_f64();
 
     // ロックファイルにタイムスタンプとプロセスIDを書き込む
-    let metadata = format!("{},{}", timestamp, pid);
+    let metadata = format!("{timestamp},{pid}");
     lock.file.set_len(0)?;
     lock.file.write_all(metadata.as_bytes())?;
     lock.file.flush()?;
