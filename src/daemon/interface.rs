@@ -2,7 +2,7 @@ use crate::cli::GlobalOptions;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser, Serialize, Deserialize, Debug)]
 pub struct DaemonFormatArgs {
@@ -80,7 +80,7 @@ pub struct DaemonSocketPath {
 /// The socket file is used to communicate with the daemon.
 /// The info file is used to store the daemon's pid, start time, and log file paths.
 impl DaemonSocketPath {
-    pub fn from_socket_dir(socket_dir: &PathBuf) -> Self {
+    pub fn from_socket_dir(socket_dir: &Path) -> Self {
         Self {
             socket_path: socket_dir.join("daemon-cmd.sock"),
             info_path: socket_dir.join("daemon-cmd.sock.info"),

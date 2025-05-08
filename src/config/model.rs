@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use url::Url;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -14,11 +14,11 @@ pub enum OnRule {
 }
 
 impl OnRule {
-    pub fn on_match(&self, target_path: &PathBuf) -> bool {
+    pub fn on_match(&self, target_path: &Path) -> bool {
         match self {
             OnRule::Extension(ext) => target_path
                 .extension()
-                .map_or(false, |e| &format!(".{}", e.to_string_lossy()) == ext),
+                .is_some_and(|e| &format!(".{}", e.to_string_lossy()) == ext),
             OnRule::Or(rules) => rules.iter().any(|rule| rule.on_match(target_path)),
         }
     }
@@ -67,10 +67,7 @@ pub enum SomeCommand {
 
 impl SomeCommand {
     pub fn is_pure(&self) -> bool {
-        match self {
-            SomeCommand::Pure { .. } => true,
-            _ => false,
-        }
+        matches!(self, SomeCommand::Pure { .. })
     }
 }
 
@@ -82,7 +79,7 @@ pub struct Rule {
 }
 
 impl Rule {
-    pub fn on_match(&self, target_path: &PathBuf, force_pure: bool) -> bool {
+    pub fn on_match(&self, target_path: &Path, force_pure: bool) -> bool {
         if force_pure && !self.some_cmd.is_pure() {
             return false;
         }
@@ -105,7 +102,7 @@ fn none<T>() -> Option<T> {
 }
 
 impl Config {
-    pub fn find_matched_rule(&self, target_path: &PathBuf, force_pure: bool) -> Option<Rule> {
+    pub fn find_matched_rule(&self, target_path: &Path, force_pure: bool) -> Option<Rule> {
         for rule in &self.rules {
             if rule.on_match(target_path, force_pure) {
                 return Some(rule.clone());
@@ -121,7 +118,7 @@ pub fn load_str(json: &str) -> anyhow::Result<Config> {
     serde_json::from_str(json).map_err(|e| anyhow!(e))
 }
 
-pub fn load_file(path: &PathBuf) -> anyhow::Result<Config> {
+pub fn load_file(path: &Path) -> anyhow::Result<Config> {
     // memo: in my measurement, this implementation is faster than serde_json::from_reader, etc
     let mut file = fs::File::open(path).context("Failed to open file")?;
     let mut buffer = Vec::new();
@@ -133,24 +130,23 @@ pub fn load_file(path: &PathBuf) -> anyhow::Result<Config> {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_on_rule_extension_match() {
         let on_rule = OnRule::Extension(".rs".to_string());
 
-        let path = PathBuf::from("hello_world.rs");
-        assert!(on_rule.on_match(&path), "Should match `.rs` extension");
+        let path = Path::new("hello_world.rs");
+        assert!(on_rule.on_match(path), "Should match `.rs` extension");
 
-        let path_ts = PathBuf::from("example.ts");
+        let path_ts = Path::new("example.ts");
         assert!(
-            !on_rule.on_match(&path_ts),
+            !on_rule.on_match(path_ts),
             "Should not match `.ts` extension"
         );
 
-        let path_no_ext = PathBuf::from("Makefile");
+        let path_no_ext = Path::new("Makefile");
         assert!(
-            !on_rule.on_match(&path_no_ext),
+            !on_rule.on_match(path_no_ext),
             "Should not match no extension path"
         );
     }
@@ -162,15 +158,15 @@ mod tests {
             OnRule::Extension(".js".to_string()),
         ]);
 
-        let path_rs = PathBuf::from("main.rs");
-        assert!(on_rule.on_match(&path_rs), "Should match an `.rs` file");
+        let path_rs = Path::new("main.rs");
+        assert!(on_rule.on_match(path_rs), "Should match an `.rs` file");
 
-        let path_js = PathBuf::from("test.js");
-        assert!(on_rule.on_match(&path_js), "Should match a `.js` file");
+        let path_js = Path::new("test.js");
+        assert!(on_rule.on_match(path_js), "Should match a `.js` file");
 
-        let path_ts = PathBuf::from("hello.ts");
+        let path_ts = Path::new("hello.ts");
         assert!(
-            !on_rule.on_match(&path_ts),
+            !on_rule.on_match(path_ts),
             "Should not match `.ts` extension"
         );
     }
@@ -211,13 +207,13 @@ mod tests {
             },
         };
 
-        let path_py = PathBuf::from("script.py");
+        let path_py = Path::new("script.py");
         assert!(
-            pure_rule.on_match(&path_py, false),
+            pure_rule.on_match(path_py, false),
             "Should match `.py` extension in non-pure mode"
         );
         assert!(
-            pure_rule.on_match(&path_py, true),
+            pure_rule.on_match(path_py, true),
             "Should match `.py` extension in pure mode"
         );
 
@@ -230,13 +226,13 @@ mod tests {
             },
         };
 
-        let path_rs = PathBuf::from("lib.rs");
+        let path_rs = Path::new("lib.rs");
         assert!(
-            write_rule.on_match(&path_rs, false),
+            write_rule.on_match(path_rs, false),
             "Should match `.rs` extension in non-pure mode"
         );
         assert!(
-            !write_rule.on_match(&path_rs, true),
+            !write_rule.on_match(path_rs, true),
             "Should not match if forced pure, but is a write command"
         );
     }
@@ -260,8 +256,8 @@ mod tests {
 
         let config: Config = serde_json::from_str(json).expect("Should parse valid JSON");
 
-        let path_ts = PathBuf::from("app.ts");
-        let matched_ts = config.find_matched_rule(&path_ts, false);
+        let path_ts = Path::new("app.ts");
+        let matched_ts = config.find_matched_rule(path_ts, false);
         assert!(
             matched_ts.is_some(),
             "Should find a matching rule for `.ts`"
@@ -271,8 +267,8 @@ mod tests {
             "Expected `.ts` rule to be a pure command"
         );
 
-        let path_rs = PathBuf::from("main.rs");
-        let matched_rs = config.find_matched_rule(&path_rs, false);
+        let path_rs = Path::new("main.rs");
+        let matched_rs = config.find_matched_rule(path_rs, false);
         assert!(
             matched_rs.is_some(),
             "Should find a matching rule for `.rs`"
@@ -282,8 +278,8 @@ mod tests {
             "Expected `.rs` rule to be a write command"
         );
 
-        let path_py = PathBuf::from("script.py");
-        let matched_py = config.find_matched_rule(&path_py, false);
+        let path_py = Path::new("script.py");
+        let matched_py = config.find_matched_rule(path_py, false);
         assert!(matched_py.is_none(), "No rule should match `.py`");
     }
 
@@ -313,7 +309,7 @@ mod tests {
             on: OnRule::Or(rules),
             some_cmd,
             ..
-        }) = deserialized.rules.get(0)
+        }) = deserialized.rules.first()
         {
             assert_eq!(
                 rules.len(),
@@ -462,8 +458,8 @@ mod tests {
 
     #[test]
     fn test_load_file_nonexistent() {
-        let nonexistent_path = PathBuf::from("/path/that/does/not/exist.json");
-        let result = load_file(&nonexistent_path);
+        let nonexistent_path = Path::new("/path/that/does/not/exist.json");
+        let result = load_file(nonexistent_path);
 
         assert!(result.is_err(), "Should fail with nonexistent file");
         assert!(

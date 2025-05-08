@@ -20,8 +20,10 @@ pub fn bulk_format_execute_with_args(
     args: BulkFormatArgs,
     global_options: GlobalOptions,
 ) -> Result<()> {
-    let (_, socket_dir) =
-        load_config_and_socket(&global_options.config_file, &global_options.socket_dir)?;
+    let (_, socket_dir) = load_config_and_socket(
+        global_options.config_file.as_deref(),
+        global_options.socket_dir.as_deref(),
+    )?;
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 

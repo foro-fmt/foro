@@ -98,7 +98,7 @@ pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
                         info!("ping timed out");
                         Ok(false)
                     } else {
-                        Err(err.into())
+                        Err(err)
                     }
                 }
             }
@@ -139,12 +139,12 @@ pub fn ensure_daemon_running(
     socket: &DaemonSocketPath,
     global_options: &GlobalOptions,
 ) -> Result<DaemonStatus> {
-    let status = daemon_is_alive(&socket)?;
+    let status = daemon_is_alive(socket)?;
 
     match status {
         DaemonStatus::NotRunning => {
-            start_daemon(&socket, false)?;
-            Ok(daemon_is_alive(&socket)?)
+            start_daemon(socket, false)?;
+            Ok(daemon_is_alive(socket)?)
         }
         DaemonStatus::Running(ref daemon_build_id) => {
             let current_build_id = get_build_id();
@@ -165,8 +165,8 @@ pub fn ensure_daemon_running(
                         None,
                     )?;
 
-                    start_daemon(&socket, false)?;
-                    return Ok(daemon_is_alive(&socket)?);
+                    start_daemon(socket, false)?;
+                    return daemon_is_alive(socket);
                 }
             }
 
@@ -186,12 +186,12 @@ pub fn run_command(
     check_alive: bool,
 ) -> Result<()> {
     if check_alive {
-        match daemon_is_alive(&socket)? {
+        match daemon_is_alive(socket)? {
             DaemonStatus::NotRunning => {
                 match command {
                     DaemonCommands::Stop => {
                         // in rare cases, daemon_is_alive return false, but the process may still be alive
-                        if !ping(&socket)? {
+                        if !ping(socket)? {
                             info!("Daemon is not running");
                             return Ok(());
                         }

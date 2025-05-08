@@ -9,7 +9,7 @@ use minijinja;
 use serde_json::{json, to_value, Value};
 use std::fs;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::Path;
 use url::Url;
 use wasmtime::{Instance, Store};
 use wasmtime_wasi::preview1::WasiP1Ctx;
@@ -136,7 +136,7 @@ fn run_plugin_inner_native(library: &mut Library, cur_map: Value) -> Result<Valu
 fn run_plugin_inner(library: &mut Library, cur_map: Value) -> Result<Value> {
     match library {
         Library::WasmLibrary(WasmLibrary { instance, store }) => {
-            run_plugin_inner_wasm(instance.clone(), store, cur_map)
+            run_plugin_inner_wasm(*instance, store, cur_map)
         }
         Library::NativeLibrary(NativeLibrary { .. }) => run_plugin_inner_native(library, cur_map),
     }
@@ -145,18 +145,18 @@ fn run_plugin_inner(library: &mut Library, cur_map: Value) -> Result<Value> {
 fn run_plugin(
     setting: PluginSetting,
     cur_json: Value,
-    cache_path: &PathBuf,
+    cache_path: &Path,
     use_cache: bool,
 ) -> Result<Value> {
     let use_cache = use_cache && setting.cache;
 
     if use_cache {
-        return run_multi_cached(&setting.source, cache_path, |lib| {
+        return run_multi_cached(&setting.source, &cache_path.to_path_buf(), |lib| {
             run_plugin_inner(lib, cur_json.clone())
         });
     }
 
-    let mut lib = load(&setting.source, cache_path)?;
+    let mut lib = load(&setting.source, &cache_path.to_path_buf())?;
 
     run_plugin_inner(&mut lib, cur_json)
 }
@@ -164,7 +164,7 @@ fn run_plugin(
 fn run_inner_pure_command(
     command: &PureCommand,
     mut cur_json: Value,
-    cache_path: &PathBuf,
+    cache_path: &Path,
     use_cache: bool,
 ) -> Result<Value> {
     match command {
@@ -254,7 +254,7 @@ fn run_inner_pure_command(
 fn run_inner_write_command(
     command: &WriteCommand,
     cur_json: Value,
-    cache_path: &PathBuf,
+    cache_path: &Path,
     use_cache: bool,
 ) -> Result<Value> {
     match command {
@@ -317,9 +317,9 @@ fn run_inner_write_command(
 /// via [run_flow], [CommandWithControlFlow] etc.
 fn run_flow<T>(
     command_with_control_flow: &CommandWithControlFlow<T>,
-    run_inner: fn(&T, Value, &PathBuf, bool) -> Result<Value>,
+    run_inner: fn(&T, Value, &Path, bool) -> Result<Value>,
     mut cur_json: Value,
-    cache_path: &PathBuf,
+    cache_path: &Path,
     use_cache: bool,
 ) -> Result<Value> {
     match command_with_control_flow {
@@ -395,7 +395,7 @@ fn run_flow<T>(
 pub fn run(
     some_command: &SomeCommand,
     cur_json: Value,
-    cache_path: &PathBuf,
+    cache_path: &Path,
     use_cache: bool,
 ) -> Result<Value> {
     debug!("run command: {:?}", some_command);
@@ -415,17 +415,13 @@ pub fn run(
             }
             res
         }
-        SomeCommand::Write { write_cmd } => {
-            let res = run_flow(
-                write_cmd,
-                run_inner_write_command,
-                cur_json,
-                cache_path,
-                use_cache,
-            )?;
-
-            res
-        }
+        SomeCommand::Write { write_cmd } => run_flow(
+            write_cmd,
+            run_inner_write_command,
+            cur_json,
+            cache_path,
+            use_cache,
+        )?,
     };
 
     debug!("done command: {:?}", some_command);
@@ -437,7 +433,7 @@ pub fn run(
 pub fn run_pure(
     command: &CommandWithControlFlow<PureCommand>,
     cur_json: Value,
-    cache_path: &PathBuf,
+    cache_path: &Path,
     use_cache: bool,
 ) -> Result<Value> {
     debug!("run pure command: {:?}", command);

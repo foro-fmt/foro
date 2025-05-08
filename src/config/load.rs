@@ -4,8 +4,9 @@ use crate::config::model::Config;
 use crate::debug_long;
 use anyhow::{Context, Result};
 use log::{debug, info};
+use std::borrow::Cow;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // functions that manually inject resolvers
 // ----------------------------------------
@@ -20,12 +21,12 @@ pub(crate) fn get_or_create_default_config_with<R: AppDirResolver>(
 
         fs::DirBuilder::new()
             .recursive(true)
-            .create(&config_path.parent()?)
+            .create(config_path.parent()?)
             .ok()?;
 
         let default_config = include_str!("default_config.json");
 
-        fs::write(&config_path, &default_config).ok()?;
+        fs::write(&config_path, default_config).ok()?;
 
         info!("created default config file: {:?}", config_path);
         info!("content: {:?}", default_config);
@@ -36,19 +37,22 @@ pub(crate) fn get_or_create_default_config_with<R: AppDirResolver>(
 
 pub(crate) fn load_config_and_cache_with<R: AppDirResolver>(
     resolver: &R,
-    given_config_file: &Option<PathBuf>,
-    given_cache_dir: &Option<PathBuf>,
+    given_config_file: Option<&Path>,
+    given_cache_dir: Option<&Path>,
 ) -> Result<(Config, PathBuf)> {
-    let config_file = given_config_file
-        .clone()
-        .or_else(|| get_or_create_default_config_with(resolver))
-        .context("Could not get config directory")?;
+    let config_file = match given_config_file {
+        Some(p) => Cow::Borrowed(p),
+        None => Cow::Owned(
+            get_or_create_default_config_with(resolver)
+                .context("Failed to get config directory")?,
+        ),
+    };
 
     let config = load_file(&config_file)
         .with_context(|| format!("Failed to load config file ({:?})", &config_file))?;
 
     let cache_dir = given_cache_dir
-        .clone()
+        .map(Path::to_path_buf)
         .or(config.cache_dir.clone())
         .or_else(|| resolver.cache_dir())
         .context("Failed to get cache directory")?;
@@ -62,19 +66,22 @@ pub(crate) fn load_config_and_cache_with<R: AppDirResolver>(
 
 pub(crate) fn load_config_and_socket_with<R: AppDirResolver>(
     resolver: &R,
-    given_config_file: &Option<PathBuf>,
-    given_socket_dir: &Option<PathBuf>,
+    given_config_file: Option<&Path>,
+    given_socket_dir: Option<&Path>,
 ) -> Result<(Config, PathBuf)> {
-    let config_file = given_config_file
-        .clone()
-        .or_else(|| get_or_create_default_config_with(resolver))
-        .context("Failed to get config directory")?;
+    let config_file = match given_config_file {
+        Some(p) => Cow::Borrowed(p),
+        None => Cow::Owned(
+            get_or_create_default_config_with(resolver)
+                .context("Failed to get config directory")?,
+        ),
+    };
 
     let config = load_file(&config_file)
         .with_context(|| format!("Failed to load config file ({:?})", &config_file))?;
 
     let socket_dir = given_socket_dir
-        .clone()
+        .map(Path::to_path_buf)
         .or(config.socket_dir.clone())
         .or_else(|| resolver.socket_dir())
         .context("Failed to get socket directory")?;
@@ -88,26 +95,31 @@ pub(crate) fn load_config_and_socket_with<R: AppDirResolver>(
 
 pub(crate) fn load_paths_with<R: AppDirResolver>(
     resolver: &R,
-    given_config_file: &Option<PathBuf>,
-    given_cache_dir: &Option<PathBuf>,
-    given_socket_dir: &Option<PathBuf>,
+    given_config_file: Option<&Path>,
+    given_cache_dir: Option<&Path>,
+    given_socket_dir: Option<&Path>,
 ) -> Result<(PathBuf, PathBuf, PathBuf)> {
-    let config_file = given_config_file
-        .clone()
-        .or_else(|| get_or_create_default_config_with(resolver))
-        .context("Failed to get config directory")?;
+    let config_file: Cow<'_, Path> = match given_config_file {
+        Some(p) => Cow::Borrowed(p),
+        None => Cow::Owned(
+            get_or_create_default_config_with(resolver)
+                .context("Failed to get config directory")?,
+        ),
+    };
 
     let config = load_file(&config_file)
         .with_context(|| format!("Failed to load config file ({:?})", &config_file))?;
 
+    let config_file = config_file.to_path_buf();
+
     let cache_dir = given_cache_dir
-        .clone()
+        .map(Path::to_path_buf)
         .or(config.cache_dir.clone())
         .or_else(|| resolver.cache_dir())
         .context("Failed to get cache directory")?;
 
     let socket_dir = given_socket_dir
-        .clone()
+        .map(Path::to_path_buf)
         .or(config.socket_dir.clone())
         .or_else(|| resolver.socket_dir())
         .context("Failed to get socket directory")?;
@@ -123,8 +135,8 @@ pub(crate) fn get_or_create_default_config() -> Option<PathBuf> {
 }
 
 pub(crate) fn load_config_and_cache(
-    given_config_file: &Option<PathBuf>,
-    given_cache_dir: &Option<PathBuf>,
+    given_config_file: Option<&Path>,
+    given_cache_dir: Option<&Path>,
 ) -> Result<(Config, PathBuf)> {
     load_config_and_cache_with(
         &DefaultAppDirResolver {},
@@ -134,8 +146,8 @@ pub(crate) fn load_config_and_cache(
 }
 
 pub(crate) fn load_config_and_socket(
-    given_config_file: &Option<PathBuf>,
-    given_socket_dir: &Option<PathBuf>,
+    given_config_file: Option<&Path>,
+    given_socket_dir: Option<&Path>,
 ) -> Result<(Config, PathBuf)> {
     load_config_and_socket_with(
         &DefaultAppDirResolver {},
@@ -145,9 +157,9 @@ pub(crate) fn load_config_and_socket(
 }
 
 pub(crate) fn load_paths(
-    given_config_file: &Option<PathBuf>,
-    given_cache_dir: &Option<PathBuf>,
-    given_socket_dir: &Option<PathBuf>,
+    given_config_file: Option<&Path>,
+    given_cache_dir: Option<&Path>,
+    given_socket_dir: Option<&Path>,
 ) -> Result<(PathBuf, PathBuf, PathBuf)> {
     load_paths_with(
         &DefaultAppDirResolver {},
@@ -282,8 +294,11 @@ mod tests {
         let given_cache_dir = Some(custom_cache_dir.clone());
 
         // User-provided cache_dir should take precedence.
-        let (loaded_config, loaded_cache_dir) =
-            load_config_and_cache_with(&resolver, &given_config_file, &given_cache_dir)?;
+        let (loaded_config, loaded_cache_dir) = load_config_and_cache_with(
+            &resolver,
+            given_config_file.as_deref(),
+            given_cache_dir.as_deref(),
+        )?;
 
         assert_eq!(loaded_cache_dir, custom_cache_dir);
         assert_eq!(loaded_config.rules.len(), 1);
@@ -307,7 +322,7 @@ mod tests {
         };
 
         // This should create the default config and use resolver's cache_dir.
-        let (config, used_cache_dir) = load_config_and_cache_with(&resolver, &None, &None)?;
+        let (config, used_cache_dir) = load_config_and_cache_with(&resolver, None, None)?;
 
         let written_config = fs::read_to_string(&config_file_path)?;
         assert_eq!(written_config, default_config_str());
@@ -342,8 +357,8 @@ mod tests {
 
         let (config, used_socket_dir) = load_config_and_socket_with(
             &resolver,
-            &Some(config_file_path),
-            &Some(socket_dir_path.clone()),
+            Some(&config_file_path),
+            Some(&socket_dir_path),
         )?;
 
         assert!(config.rules.is_empty());
@@ -378,7 +393,7 @@ mod tests {
 
         // If config_file is Some(...), it should load from it.
         let (actual_config_file, actual_cache, actual_socket) =
-            load_paths_with(&resolver, &Some(config_file_path.clone()), &None, &None)?;
+            load_paths_with(&resolver, Some(&config_file_path), None, None)?;
 
         assert_eq!(actual_config_file, config_file_path);
         assert_eq!(actual_cache, PathBuf::from("/from_config_cache"));
@@ -386,7 +401,7 @@ mod tests {
 
         // If config_file is None, it creates the default config if none is found.
         fs::remove_file(&config_file_path)?; // Remove it to force creation.
-        let (cf, _, _) = load_paths_with(&resolver, &None, &None, &None)?;
+        let (cf, _, _) = load_paths_with(&resolver, None, None, None)?;
         let default_content = fs::read_to_string(&config_file_path)?;
         assert_eq!(default_content, default_config_str());
         assert_eq!(cf, config_file_path);
@@ -408,44 +423,11 @@ mod tests {
         assert!(result.is_none());
 
         // load_config_and_cache_with should fail in this situation.
-        let err = load_config_and_cache_with(&resolver, &None, &None).unwrap_err();
+        let err = load_config_and_cache_with(&resolver, None, None).unwrap_err();
         assert!(
-            err.to_string().contains("Could not get config directory"),
+            err.to_string().contains("Failed to get config directory"),
             "Expected an error about missing config directory."
         );
-    }
-
-    #[test]
-    fn test_wrapper_functions_with_mocked_resolver() -> Result<()> {
-        use std::sync::Once;
-
-        static INIT: Once = Once::new();
-        static mut MOCK_CONFIG_PATH: Option<PathBuf> = None;
-        static mut MOCK_CACHE_PATH: Option<PathBuf> = None;
-        static mut MOCK_SOCKET_PATH: Option<PathBuf> = None;
-
-        unsafe fn init_mocks() {
-            INIT.call_once(|| {
-                let temp_dir = tempdir().expect("Failed to create temp dir");
-                MOCK_CONFIG_PATH = Some(temp_dir.path().join("mock_config.json"));
-                MOCK_CACHE_PATH = Some(temp_dir.path().join("mock_cache"));
-                MOCK_SOCKET_PATH = Some(temp_dir.path().join("mock_socket"));
-
-                fs::write(
-                    MOCK_CONFIG_PATH.as_ref().unwrap(),
-                    r#"{"rules":[],"cache_dir":null,"socket_dir":null}"#,
-                )
-                .expect("Failed to write mock config");
-
-                std::mem::forget(temp_dir);
-            });
-        }
-
-        unsafe {
-            init_mocks();
-        }
-
-        Ok(())
     }
 
     #[test]
@@ -475,7 +457,7 @@ mod tests {
         let given_config = Some(config_path);
         let given_cache = Some(cache_path.clone());
 
-        let result = load_config_and_cache(&given_config, &given_cache);
+        let result = load_config_and_cache(given_config.as_deref(), given_cache.as_deref());
 
         assert!(result.is_ok(), "load_config_and_cache should return Ok");
         if let Ok((config, cache_dir)) = result {
@@ -503,7 +485,7 @@ mod tests {
         let given_config = Some(config_path);
         let given_socket = Some(socket_path.clone());
 
-        let result = load_config_and_socket(&given_config, &given_socket);
+        let result = load_config_and_socket(given_config.as_deref(), given_socket.as_deref());
 
         assert!(result.is_ok(), "load_config_and_socket should return Ok");
         if let Ok((config, socket_dir)) = result {
@@ -533,7 +515,11 @@ mod tests {
         let given_cache = Some(cache_path.clone());
         let given_socket = Some(socket_path.clone());
 
-        let result = load_paths(&given_config, &given_cache, &given_socket);
+        let result = load_paths(
+            given_config.as_deref(),
+            given_cache.as_deref(),
+            given_socket.as_deref(),
+        );
 
         assert!(result.is_ok(), "load_paths should return Ok");
         if let Ok((config_file, cache_dir, socket_dir)) = result {
@@ -604,14 +590,15 @@ mod tests {
             log_path: None,
         };
 
-        let result = load_config_and_socket_with(&resolver, &None, &None);
+        let result = load_config_and_socket_with(&resolver, None, None);
+
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
             .contains("Failed to get config directory"));
 
-        let result = load_config_and_socket_with(&resolver, &Some(nonexistent_config), &None);
+        let result = load_config_and_socket_with(&resolver, Some(&nonexistent_config), None);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -638,7 +625,7 @@ mod tests {
             log_path: None,
         };
 
-        let result = load_paths_with(&resolver, &Some(config_path), &None, &None);
+        let result = load_paths_with(&resolver, Some(&config_path), None, None);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -707,7 +694,7 @@ mod tests {
             log_path: None,
         };
 
-        let _ = load_config_and_cache_with(&resolver, &Some(config_path), &None);
+        let _ = load_config_and_cache_with(&resolver, Some(&config_path), None);
 
         Ok(())
     }
@@ -742,7 +729,7 @@ mod tests {
             log_path: None,
         };
 
-        let _ = load_config_and_socket_with(&resolver, &Some(config_path), &None);
+        let _ = load_config_and_socket_with(&resolver, Some(&config_path), None);
 
         Ok(())
     }

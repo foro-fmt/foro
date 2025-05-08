@@ -46,7 +46,7 @@ pub fn daemon_format_execute_with_args(
 
     let (tx, rx) = mpsc::channel();
 
-    let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(|| Instant::now()));
+    let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(Instant::now));
     let t_target_path = target_path.clone();
 
     // Even if formatting command has finished (i.e., writing to the file has completed),
@@ -63,8 +63,10 @@ pub fn daemon_format_execute_with_args(
             let _ = start.set(parent_start_time);
         });
 
-        let (config, cache_dir) =
-            load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+        let (config, cache_dir) = load_config_and_cache(
+            global_options.config_file.as_deref(),
+            global_options.cache_dir.as_deref(),
+        )?;
 
         // todo: why not fs::read ?
         let file = fs::File::open(&t_target_path)?;
@@ -184,8 +186,10 @@ pub fn daemon_pure_format_execute_with_args(
 ) -> Result<DaemonPureFormatResponse> {
     let target_path = current_dir.join(&args.path).canonicalize()?;
 
-    let (config, cache_dir) =
-        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+    let (config, cache_dir) = load_config_and_cache(
+        global_options.config_file.as_deref(),
+        global_options.cache_dir.as_deref(),
+    )?;
 
     let rule = match config.find_matched_rule(&target_path, true) {
         Some(rule) => rule,
@@ -269,8 +273,10 @@ pub fn daemon_bulk_format_execute_with_args(
         })
         .collect::<Result<Vec<PathBuf>>>()?;
 
-    let (config, cache_dir) =
-        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+    let (config, cache_dir) = load_config_and_cache(
+        global_options.config_file.as_deref(),
+        global_options.cache_dir.as_deref(),
+    )?;
 
     let opt = BulkFormatOption {
         paths,
@@ -504,7 +510,7 @@ pub fn daemon_main(socket: WrappedUnixSocket) {
             }
         }
 
-        if let Ok(_) = rx.try_recv() {
+        if rx.try_recv().is_ok() {
             break;
         }
 
@@ -531,7 +537,7 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
             drop(writer);
 
             let mut buf = [0];
-            match reader.read(buf.as_mut_slice()) {
+            match reader.read_exact(buf.as_mut_slice()) {
                 Ok(_) => Ok(()),
                 Err(err) => {
                     error!("Failed to read from child: {}", err);
@@ -557,14 +563,12 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
 
             let stdout_fd = OpenOptions::new()
                 .create(true)
-                .write(true)
                 .append(true)
                 .open(log_dir.join("foro-stdout.log"))?
                 .into_raw_fd();
 
             let stderr_fd = OpenOptions::new()
                 .create(true)
-                .write(true)
                 .append(true)
                 .open(log_dir.join("foro.log"))?
                 .into_raw_fd();

@@ -6,7 +6,7 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::prelude::*;
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Parser, Debug)]
 pub struct InternalInfoArgs {}
@@ -34,12 +34,12 @@ pub fn internal_info_execute_with_args(
 
     let info_input: InfoInput = serde_json::from_str(&input).context("Failed to parse input")?;
 
-    let given_config_file = info_input.given_config_file.map(PathBuf::from);
-    let given_cache_dir = info_input.given_cache_dir.map(PathBuf::from);
-    let given_socket_dir = info_input.given_socket_dir.map(PathBuf::from);
+    let given_config_file = info_input.given_config_file.as_deref().map(Path::new);
+    let given_cache_dir = info_input.given_cache_dir.as_deref().map(Path::new);
+    let given_socket_dir = info_input.given_socket_dir.as_deref().map(Path::new);
 
     let (config_file, cache_dir, socket_dir) =
-        load_paths(&given_config_file, &given_cache_dir, &given_socket_dir)?;
+        load_paths(given_config_file, given_cache_dir, given_socket_dir)?;
 
     let info_output = InfoOutput {
         config_file: config_file.to_string_lossy().to_string(),

@@ -20,15 +20,17 @@ pub fn cache_clean_execute_with_args(
     args: CacheCleanArgs,
     global_options: GlobalOptions,
 ) -> Result<()> {
-    let (_, cache_dir) =
-        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+    let (_, cache_dir) = load_config_and_cache(
+        global_options.config_file.as_deref(),
+        global_options.cache_dir.as_deref(),
+    )?;
 
     if !cache_dir.exists() {
         debug!("cache directory does not exist, so we do nothing");
         return Ok(());
     }
 
-    if (!(cache_dir.file_name() == Some("foro".as_ref()))) && (!args.yes) {
+    if (cache_dir.file_name() != Some("foro".as_ref())) && (!args.yes) {
         debug!("cache directory seems not to be foro cache directory, so we ask the user");
 
         let confirm = Confirm::new()
@@ -66,8 +68,10 @@ pub fn cache_remove_execute_with_args(
     args: CacheRemoveArgs,
     global_options: GlobalOptions,
 ) -> Result<()> {
-    let (_, cache_dir) =
-        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+    let (_, cache_dir) = load_config_and_cache(
+        global_options.config_file.as_deref(),
+        global_options.cache_dir.as_deref(),
+    )?;
 
     // In Windows, it takes a little while for the process to stop,
     // and if you try to connect during that time, we will get an error,
@@ -120,8 +124,10 @@ pub fn cache_dir_execute_with_args(
     _args: CacheDirArgs,
     global_options: GlobalOptions,
 ) -> Result<()> {
-    let (_, cache_dir) =
-        load_config_and_cache(&global_options.config_file, &global_options.cache_dir)?;
+    let (_, cache_dir) = load_config_and_cache(
+        global_options.config_file.as_deref(),
+        global_options.cache_dir.as_deref(),
+    )?;
 
     println!("Cache Directory: {:?}", cache_dir);
 

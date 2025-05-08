@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use assert_cmd::prelude::*;
 use assert_fs::fixture::ChildPath;
 use assert_fs::prelude::*;
@@ -49,7 +51,7 @@ pub struct TestEnv {
 
 impl TestEnv {
     pub fn new<P: AsRef<Path>>(fixture_path: P) -> Self {
-        TestEnvBuilder::new(fixture_path.as_ref().to_path_buf()).build()
+        TestEnvBuilder::new(fixture_path.as_ref()).build()
     }
 
     fn construct(&self) {
@@ -86,14 +88,14 @@ impl TestEnv {
     }
 
     pub fn build_option(&self) -> Vec<String> {
-        let mut args = Vec::new();
-        args.push("--config-file".to_string());
-        args.push(self.config_file.path().to_str().unwrap().to_string());
-        args.push("--cache-dir".to_string());
-        args.push(self.cache.path().to_str().unwrap().to_string());
-        args.push("--socket-dir".to_string());
-        args.push(self.socket_dir.path().to_str().unwrap().to_string());
-        args
+        vec![
+            "--config-file".to_string(),
+            self.config_file.path().to_str().unwrap().to_string(),
+            "--cache-dir".to_string(),
+            self.cache.path().to_str().unwrap().to_string(),
+            "--socket-dir".to_string(),
+            self.socket_dir.path().to_str().unwrap().to_string(),
+        ]
     }
 
     pub fn raw_foro(&self, args: &[&str]) -> Command {

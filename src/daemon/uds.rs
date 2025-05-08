@@ -1,4 +1,4 @@
-/// Unix Domain Socket (UDS) module
+//! Unix Domain Socket (UDS) module
 
 #[cfg(unix)]
 pub use std::os::unix::net::{UnixListener, UnixStream};

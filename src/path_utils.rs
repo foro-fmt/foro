@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use std::path::PathBuf;
+use std::path::Path;
 
 // Suppress unused warnings in unix
 #[allow(unused)]
@@ -28,7 +28,7 @@ fn convert_windows_path(path_str: &str) -> Result<String> {
 }
 
 #[cfg(not(windows))]
-pub fn normalize_path(path: &PathBuf) -> Result<String> {
+pub fn normalize_path(path: &Path) -> Result<String> {
     path.canonicalize()?
         .to_str()
         .map(|s| s.to_string())
@@ -36,7 +36,7 @@ pub fn normalize_path(path: &PathBuf) -> Result<String> {
 }
 
 #[cfg(windows)]
-pub fn normalize_path(path: &PathBuf) -> Result<String> {
+pub fn normalize_path(path: &Path) -> Result<String> {
     use anyhow::Context;
 
     let abs = path.canonicalize()?;
@@ -48,7 +48,7 @@ pub fn normalize_path(path: &PathBuf) -> Result<String> {
 }
 
 #[cfg(not(windows))]
-pub fn to_wasm_path(path: &PathBuf) -> Result<String> {
+pub fn to_wasm_path(path: &Path) -> Result<String> {
     path.canonicalize()?
         .to_str()
         .map(|s| s.to_string())
@@ -56,7 +56,7 @@ pub fn to_wasm_path(path: &PathBuf) -> Result<String> {
 }
 
 #[cfg(windows)]
-pub fn to_wasm_path(path: &PathBuf) -> Result<String> {
+pub fn to_wasm_path(path: &Path) -> Result<String> {
     use anyhow::Context;
 
     let abs = path.canonicalize()?;
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn test_normalize_path_windows() {
         assert_eq!(
-            normalize_path(&PathBuf::from(r"C:\Users\test")).unwrap(),
+            normalize_path(Path::new(r"C:\Users\test")).unwrap(),
             r"C:\Users\test"
         );
     }
@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn test_to_wasm_path_windows() {
         assert_eq!(
-            to_wasm_path(&PathBuf::from(r"C:\Users\test")).unwrap(),
+            to_wasm_path(Path::new(r"C:\Users\test")).unwrap(),
             r"/c/Users/test"
         );
     }

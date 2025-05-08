@@ -9,7 +9,7 @@ pub fn is_alive(pid: u32) -> bool {
 }
 
 fn get_boot_time() -> Result<u64> {
-    let proc_stat = fs::read_to_string(&"/proc/stat")?;
+    let proc_stat = fs::read_to_string("/proc/stat")?;
 
     for line in proc_stat.lines() {
         if line.starts_with("btime") {

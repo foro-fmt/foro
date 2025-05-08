@@ -10,8 +10,8 @@ use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use std::time::Instant;
 
 pub static IS_DAEMON_PROCESS: AtomicBool = AtomicBool::new(false);
-thread_local!(pub static DAEMON_THREAD_START: OnceCell<Instant> = OnceCell::new());
-thread_local!(pub static IS_DAEMON_MAIN_THREAD: OnceCell<bool> = OnceCell::new());
+thread_local!(pub static DAEMON_THREAD_START: OnceCell<Instant> = const { OnceCell::new() });
+thread_local!(pub static IS_DAEMON_MAIN_THREAD: OnceCell<bool> = const { OnceCell::new() });
 pub static NO_LONG_LOG: AtomicBool = AtomicBool::new(false);
 
 // created by iwanthue (https://medialab.github.io/iwanthue/)
@@ -110,7 +110,8 @@ pub(crate) fn init_env_logger(
                 }
                 write!(buf, "{level_style}{level:<5}{level_style:#} ")?;
                 write!(buf, "{path}] ")?;
-                write!(buf, "{body}\n", body = record.args())?;
+                write!(buf, "{body}", body = record.args())?;
+                writeln!(buf)?;
             } else {
                 let elapsed = start_time.elapsed();
                 let elapsed_micros = elapsed.as_micros();
@@ -123,7 +124,8 @@ pub(crate) fn init_env_logger(
                 write!(buf, "[{elapsed_micros:>5} μs ")?;
                 write!(buf, "{level_style}{level:<5}{level_style:#} ")?;
                 write!(buf, "{path}] ")?;
-                write!(buf, "{body}\n", body = record.args())?;
+                write!(buf, "{body}", body = record.args())?;
+                writeln!(buf)?;
             }
 
             Ok(())
@@ -141,7 +143,7 @@ pub(crate) fn init_env_logger(
 #[macro_export]
 macro_rules! debug_long {
     ($($arg:tt)*) => {
-        if !crate::log::NO_LONG_LOG.load(std::sync::atomic::Ordering::Relaxed) {
+        if !$crate::log::NO_LONG_LOG.load(std::sync::atomic::Ordering::Relaxed) {
             log::debug!($($arg)*);
         }
     };
@@ -150,7 +152,7 @@ macro_rules! debug_long {
 #[macro_export]
 macro_rules! trace_long {
     ($($arg:tt)*) => {
-        if !crate::log::NO_LONG_LOG.load(std::sync::atomic::Ordering::Relaxed) {
+        if !$crate::log::NO_LONG_LOG.load(std::sync::atomic::Ordering::Relaxed) {
             log::trace!($($arg)*);
         }
     };

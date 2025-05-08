@@ -10,7 +10,7 @@ use ignore::{WalkBuilder, WalkState};
 use log::{error, info, trace};
 use serde_json::json;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -25,10 +25,10 @@ pub struct BulkFormatOption {
 }
 
 fn format_file(
-    path: &PathBuf,
-    current_dir: &PathBuf,
+    path: &Path,
+    current_dir: &Path,
     config: &Config,
-    cache_path: &PathBuf,
+    cache_path: &Path,
     use_cache: bool,
 ) -> Result<bool> {
     // Return type changed to bool: true indicates the file was changed
@@ -38,12 +38,12 @@ fn format_file(
     //       we will not handle them because the was_changed judgement does not work properly.
     //       In addition, by targeting only pure rules, we will make it easier to perform future optimisations.
     let rule = config
-        .find_matched_rule(&path, true)
+        .find_matched_rule(path, true)
         .context("No rule matched")?;
 
     debug_long!("run rule: {:?}", rule);
 
-    let file = fs::File::open(&path)?;
+    let file = fs::File::open(path)?;
     let mut buf_reader = io::BufReader::new(file);
     let mut content = String::new();
     buf_reader.read_to_string(&mut content)?;
@@ -53,10 +53,10 @@ fn format_file(
     let res = run(
         &rule.some_cmd,
         json!({
-            "wasm-current-dir":  to_wasm_path(&current_dir)?,
-            "os-current-dir": normalize_path(&current_dir)?,
-            "wasm-target": to_wasm_path(&path)?,
-            "os-target": normalize_path(&path)?,
+            "wasm-current-dir":  to_wasm_path(current_dir)?,
+            "os-current-dir": normalize_path(current_dir)?,
+            "wasm-target": to_wasm_path(path)?,
+            "os-target": normalize_path(path)?,
             "raw-target": path,
             "target-content": content,
         }),
@@ -84,7 +84,7 @@ fn format_file(
 pub fn bulk_format(
     opt: &BulkFormatOption,
     config: &Config,
-    cache_path: &PathBuf,
+    cache_path: &Path,
     use_cache: bool,
 ) -> Result<(usize, usize)> {
     // Returns (count of changed files, count of unchanged files)
@@ -116,7 +116,7 @@ pub fn bulk_format(
 
     let walk = walk_builder.build_parallel();
 
-    let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(|| Instant::now()));
+    let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(Instant::now));
 
     let formatting_threads = Arc::new(Mutex::new(Vec::new()));
     let changed_count = Arc::new(AtomicUsize::new(0)); // Count of files that were changed
@@ -129,7 +129,7 @@ pub fn bulk_format(
                 Ok(dir_entry) => {
                     let opt = opt.clone();
                     let config = config.clone();
-                    let cache_path = cache_path.clone();
+                    let cache_path = cache_path.to_path_buf();
                     let changed_count = changed_count.clone();
                     let unchanged_count = unchanged_count.clone();
                     let running_count = running_count.clone();
@@ -153,7 +153,7 @@ pub fn bulk_format(
 
                         let res = format_file(
                             &path,
-                            &path.parent().unwrap().to_path_buf(),
+                            path.parent().unwrap(),
                             &config,
                             &cache_path,
                             use_cache,
