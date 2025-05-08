@@ -107,7 +107,7 @@ pub fn bulk_format(
                 continue;
             }
 
-            overrides_builder.add(&format!("!{}", line)).unwrap();
+            overrides_builder.add(&format!("!{line}")).unwrap();
         }
 
         let overrides = overrides_builder.build().unwrap();

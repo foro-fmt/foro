@@ -48,7 +48,7 @@ pub fn internal_info_execute_with_args(
     };
 
     let output = serde_json::to_string(&info_output).context("Failed to serialize output")?;
-    println!("{}", output);
+    println!("{output}");
 
     Ok(())
 }

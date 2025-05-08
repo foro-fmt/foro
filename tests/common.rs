@@ -82,8 +82,7 @@ impl TestEnv {
 
         assert_eq!(
             actual, expected,
-            "\nactual:\n{}\n\n-------------\nexpected:\n{}",
-            actual, expected
+            "\nactual:\n{actual}\n\n-------------\nexpected:\n{expected}"
         );
     }
 

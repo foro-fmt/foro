@@ -35,8 +35,7 @@ pub fn cache_clean_execute_with_args(
 
         let confirm = Confirm::new()
             .with_prompt(format!(
-                "Are you sure you want to delete the directory {:?}?",
-                cache_dir
+                "Are you sure you want to delete the directory {cache_dir:?}?"
             ))
             .default(false)
             .show_default(true);
@@ -129,7 +128,7 @@ pub fn cache_dir_execute_with_args(
         global_options.cache_dir.as_deref(),
     )?;
 
-    println!("Cache Directory: {:?}", cache_dir);
+    println!("Cache Directory: {cache_dir:?}");
 
     Ok(())
 }

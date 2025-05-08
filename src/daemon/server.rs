@@ -174,7 +174,7 @@ pub fn daemon_format_execute_with_args(
 
     // マイクロ秒単位の精度を計算
     let microseconds = nanoseconds / 1_000;
-    println!("{}.{:06}", seconds, microseconds);
+    println!("{seconds}.{microseconds:06}");
 
     Ok(DaemonFormatResponse::Success())
 }
@@ -297,7 +297,7 @@ pub fn daemon_bulk_format_execute_with_args(
             if changed_count == 1 { "file" } else { "files" }
         )
     } else {
-        format!("{} files processed. No files changed.", total_count)
+        format!("{total_count} files processed. No files changed.")
     };
 
     Ok(DaemonBulkFormatResponse::Success(message))
@@ -315,7 +315,7 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
             match res {
                 Ok(res) => DaemonResponse::Format(res),
                 Err(err) => {
-                    DaemonResponse::Format(DaemonFormatResponse::Error(format!("{:#}", err)))
+                    DaemonResponse::Format(DaemonFormatResponse::Error(format!("{err:#}")))
                 }
             }
         }
@@ -329,8 +329,7 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
             match res {
                 Ok(res) => DaemonResponse::PureFormat(res),
                 Err(err) => DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(format!(
-                    "{:#}",
-                    err
+                    "{err:#}"
                 ))),
             }
         }
@@ -344,8 +343,7 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
             match res {
                 Ok(res) => DaemonResponse::BulkFormat(res),
                 Err(err) => DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Error(format!(
-                    "{:#}",
-                    err
+                    "{err:#}"
                 ))),
             }
         }
@@ -464,7 +462,7 @@ impl WrappedUnixSocket {
         let pid = process::id();
         let start_time = get_start_time(pid)?;
         let build_id = crate::build_info::get_build_id();
-        fs::write(&info_path, format!("{},{},{}", pid, start_time, build_id))?;
+        fs::write(&info_path, format!("{pid},{start_time},{build_id}"))?;
 
         info!("Listening on: {}", path.display());
         info!("info path: {}", info_path.display());

@@ -44,7 +44,7 @@ pub fn config_path_execute_with_args(
         .or_else(get_or_create_default_config)
         .context("Failed to get config file path")?;
 
-    println!("Config File: {:?}", config_file);
+    println!("Config File: {config_file:?}");
 
     Ok(())
 }
@@ -59,9 +59,9 @@ pub fn config_show_execute_with_args(
         .context("Failed to get config file path")?;
 
     let content = std::fs::read_to_string(&config_file)
-        .with_context(|| format!("Failed to read config file: {:?}", config_file))?;
+        .with_context(|| format!("Failed to read config file: {config_file:?}"))?;
 
-    println!("{}", content);
+    println!("{content}");
 
     Ok(())
 }
@@ -71,6 +71,6 @@ pub fn config_default_execute_with_args(
     _global_options: GlobalOptions,
 ) -> Result<()> {
     let default_config = include_str!("../config/default_config.json");
-    println!("{}", default_config);
+    println!("{default_config}");
     Ok(())
 }

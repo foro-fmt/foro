@@ -219,7 +219,7 @@ pub fn run_command(
         }
         DaemonResponse::PureFormat(DaemonPureFormatResponse::Success(formatted)) => {
             info!("Success to format");
-            println!("{}", formatted);
+            println!("{formatted}");
         }
         DaemonResponse::PureFormat(DaemonPureFormatResponse::Ignored(reason)) => {
             info!("File ignored. reason: {}", reason);

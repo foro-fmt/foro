@@ -32,7 +32,7 @@ fn get_start_time_clock_tick(pid: u32) -> Result<u64> {
 
     let stat_path = format!("/proc/{}/stat", pid.as_raw());
     let stat_content = fs::read_to_string(&stat_path)
-        .with_context(|| format!("Failed to read stat file: {}", stat_path))?;
+        .with_context(|| format!("Failed to read stat file: {stat_path}"))?;
 
     let start_time = stat_content
         .split_whitespace()
