@@ -314,9 +314,7 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 
             match res {
                 Ok(res) => DaemonResponse::Format(res),
-                Err(err) => {
-                    DaemonResponse::Format(DaemonFormatResponse::Error(format!("{err:#}")))
-                }
+                Err(err) => DaemonResponse::Format(DaemonFormatResponse::Error(format!("{err:#}"))),
             }
         }
         DaemonCommands::PureFormat(s_args) => {
@@ -328,9 +326,9 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 
             match res {
                 Ok(res) => DaemonResponse::PureFormat(res),
-                Err(err) => DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(format!(
-                    "{err:#}"
-                ))),
+                Err(err) => {
+                    DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(format!("{err:#}")))
+                }
             }
         }
         DaemonCommands::BulkFormat(s_args) => {
@@ -342,9 +340,9 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 
             match res {
                 Ok(res) => DaemonResponse::BulkFormat(res),
-                Err(err) => DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Error(format!(
-                    "{err:#}"
-                ))),
+                Err(err) => {
+                    DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Error(format!("{err:#}")))
+                }
             }
         }
         DaemonCommands::Stop => DaemonResponse::Stop,
