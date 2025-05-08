@@ -433,6 +433,7 @@ impl WrappedUnixSocket {
                 let as_daemon_path = DaemonSocketPath {
                     socket_path: path.clone(),
                     info_path: info_path.clone(),
+                    lock_path: info_path.with_extension("lock"),
                 };
 
                 if ping(&as_daemon_path)? {

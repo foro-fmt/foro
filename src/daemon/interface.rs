@@ -73,6 +73,7 @@ pub enum DaemonResponse {
 pub struct DaemonSocketPath {
     pub socket_path: PathBuf,
     pub info_path: PathBuf,
+    pub lock_path: PathBuf,
 }
 
 /// The path to the socket and info file for the daemon.
@@ -84,6 +85,7 @@ impl DaemonSocketPath {
         Self {
             socket_path: socket_dir.join("daemon-cmd.sock"),
             info_path: socket_dir.join("daemon-cmd.sock.info"),
+            lock_path: socket_dir.join("daemon-cmd.sock.lock"),
         }
     }
 }
