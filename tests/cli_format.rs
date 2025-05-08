@@ -228,3 +228,20 @@ fn test_test_cli_format_no_cache() {
     env.foro(&["format", "./main.rs"]);
     env.assert_eq("main.rs", "expected.rs");
 }
+
+#[test]
+#[ignore]
+fn test_test_cli_format_parallel() {
+    // When two foro formats are running simultaneously and dllpack is downloaded at the same time,
+    // cache conflicts may occur (in improper implementations), resulting in errors.
+
+    let env = TestEnvBuilder::new("./tests/fixtures/cli_format_rust/basic/")
+        .cache_dir("./cache/")
+        .build();
+
+    let mut proc_0 = env.foro_cmd(&["format", "./main.rs"]).spawn().unwrap();
+    let mut proc_1 = env.foro_cmd(&["format", "./main.rs"]).spawn().unwrap();
+
+    assert!(proc_0.wait().unwrap().success());
+    assert!(proc_1.wait().unwrap().success());
+}
