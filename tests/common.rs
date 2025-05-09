@@ -4,8 +4,9 @@ use assert_cmd::prelude::*;
 use assert_fs::fixture::ChildPath;
 use assert_fs::prelude::*;
 use std::fs;
+use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
 
 pub enum Cache {
     TempCache(ChildPath),
@@ -50,8 +51,12 @@ pub struct TestEnv {
 }
 
 impl TestEnv {
-    pub fn new<P: AsRef<Path>>(fixture_path: P) -> Self {
-        TestEnvBuilder::new(fixture_path.as_ref()).build()
+    pub fn new_fixture<P: AsRef<Path>>(fixture_path: P) -> Self {
+        TestEnvBuilder::new().fixture_path(fixture_path).build()
+    }
+
+    pub fn new() -> Self {
+        TestEnvBuilder::new().build()
     }
 
     fn construct(&self) {
@@ -113,11 +118,25 @@ impl TestEnv {
         self.raw_foro(&args)
     }
 
-    pub fn foro(&self, args: &[&str]) {
+    pub fn foro(&self, args: &[&str]) -> Output {
         let mut cmd = self.foro_cmd(args);
-        cmd.unwrap();
 
-        cmd.assert().success();
+        let res = cmd.output().unwrap();
+        assert!(res.status.success(), "Command failed: {:?}", res);
+
+        res
+    }
+
+    pub fn foro_stdout(&self, args: &[&str]) -> String {
+        let res = self.foro(args);
+
+        String::from_utf8(res.stdout).unwrap()
+    }
+
+    pub fn foro_stderr(&self, args: &[&str]) -> String {
+        let res = self.foro(args);
+
+        String::from_utf8(res.stderr).unwrap()
     }
 }
 
@@ -128,7 +147,7 @@ impl Drop for TestEnv {
 }
 
 pub struct TestEnvBuilder {
-    fixture_path: PathBuf,
+    fixture_path: Option<PathBuf>,
     work_dir: Option<PathBuf>,
     config_file: Option<PathBuf>,
     cache: Option<CacheKind>,
@@ -136,14 +155,19 @@ pub struct TestEnvBuilder {
 }
 
 impl TestEnvBuilder {
-    pub fn new<P: AsRef<Path>>(fixture_path: P) -> Self {
+    pub fn new() -> Self {
         TestEnvBuilder {
-            fixture_path: fixture_path.as_ref().to_path_buf(),
+            fixture_path: None,
             work_dir: None,
             config_file: None,
             cache: None,
             socket_dir: None,
         }
+    }
+
+    pub fn fixture_path<P: AsRef<Path>>(mut self, fixture_path: P) -> Self {
+        self.fixture_path = Some(fixture_path.as_ref().to_path_buf());
+        self
     }
 
     pub fn work_dir<P: AsRef<Path>>(mut self, work_dir: P) -> Self {
@@ -173,7 +197,9 @@ impl TestEnvBuilder {
 
     pub fn build(self) -> TestEnv {
         let temp_dir = assert_fs::TempDir::new().unwrap();
-        temp_dir.copy_from(self.fixture_path, &["**"]).unwrap();
+        if let Some(path) = &self.fixture_path {
+            temp_dir.copy_from(path, &["**"]).unwrap();
+        }
 
         let work_dir = temp_dir.child(self.work_dir.unwrap_or(PathBuf::from(".")));
         let config_file = temp_dir.child(self.config_file.unwrap_or(PathBuf::from("foro.json")));
