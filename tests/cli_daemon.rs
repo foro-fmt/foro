@@ -4,6 +4,7 @@ mod common;
 use std::io::stdout;
 use crate::common::{TestEnv, TestEnvBuilder};
 use assert_cmd::prelude::*;
+use predicates::str::contains;
 use regex::Regex;
 use serial_test::serial;
 
@@ -22,13 +23,13 @@ fn test_cli_daemon() {
         .unwrap()
         .as_str();
 
-    let res = env.foro_stderr(&["daemon", "stop"]);
-    assert!(res.contains("Daemon stopped"));
+    let mut res = env.foro_cmd(&["daemon", "stop"]);
+    res.assert().stderr(contains("Daemon stopped"));
 
     // `foro restart` when daemon is stopped should start normally
-    let res = env.foro_stderr(&["daemon", "restart"]);
-    assert!(res.contains("Daemon is not running"));
-    assert!(res.contains("Daemon started"));
+    let mut res = env.foro_cmd(&["daemon", "restart"]);
+    res.assert().stderr(contains("Daemon is not running"));
+    res.assert().stderr(contains("Daemon started"));
 
     let res = env.foro_stdout(&["daemon", "ping"]);
     let pid_1 = Regex::new(r"daemon pid: (\d+)").unwrap()
@@ -40,10 +41,10 @@ fn test_cli_daemon() {
     
     assert_ne!(pid_0, pid_1);
 
-    let res = env.foro_stderr(&["daemon", "restart"]);
-    assert!(res.contains("Daemon stopped"));
-    assert!(res.contains("Daemon started"));
-    
+    let mut res = env.foro_cmd(&["daemon", "restart"]);
+    res.assert().stderr(contains("Daemon stopped"));
+    res.assert().stderr(contains("Daemon started"));
+
     let res = env.foro_stdout(&["daemon", "ping"]);
     let pid_2 = Regex::new(r"daemon pid: (\d+)").unwrap()
         .captures(&res)
