@@ -4,7 +4,7 @@ use std::time::SystemTime;
 use std::{fs, io, path::Path, path::PathBuf, thread, time::Duration};
 
 pub struct StartupLock {
-    path: PathBuf,
+    path: Option<PathBuf>,
 }
 
 impl StartupLock {
@@ -16,7 +16,7 @@ impl StartupLock {
             match fs::create_dir(&path) {
                 Ok(()) => {
                     debug!("startup-lock acquired");
-                    return Ok(Self { path });
+                    return Ok(Self { path: Some(path) });
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => {
                     match taken_lock_started {
@@ -39,11 +39,24 @@ impl StartupLock {
             }
         }
     }
+
+    fn _free(&mut self) -> Result<()> {
+        if let Some(p) = self.path.take() {
+            fs::remove_dir_all(&p)?;
+            info!("startup-lock released explicitly");
+        }
+        Ok(())
+    }
+
+    pub fn free(mut self) -> Result<()> {
+        self._free()
+    }
 }
 
 impl Drop for StartupLock {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
-        debug!("startup-lock released");
+        if let Err(e) = self._free() {
+            warn!("failed to remove startup-lock in Drop: {e}");
+        }
     }
 }

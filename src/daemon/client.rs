@@ -140,7 +140,7 @@ pub fn ensure_daemon_running(
     socket: &DaemonSocketPath,
     global_options: &GlobalOptions,
 ) -> Result<()> {
-    let _lock = StartupLock::acquire(&socket.socket_dir);
+    let lock = StartupLock::acquire(&socket.socket_dir)?;
 
     let status = daemon_is_alive(socket)?;
 
@@ -172,6 +172,8 @@ pub fn ensure_daemon_running(
             }
         }
     }
+
+    lock.free()?;
 
     Ok(())
 }

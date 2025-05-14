@@ -6,7 +6,7 @@ use crate::daemon::server::start_daemon;
 use crate::daemon::startup_lock::StartupLock;
 use anyhow::Result;
 use clap::Parser;
-use log::error;
+use log::warn;
 
 #[derive(Parser, Debug)]
 pub struct DaemonStartArgs {
@@ -23,16 +23,18 @@ pub fn daemon_start_execute_with_args(
         global_options.socket_dir.as_deref(),
     )?;
 
-    let _lock = StartupLock::acquire(&socket_dir);
-
+    let lock = StartupLock::acquire(&socket_dir)?;
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
     if matches!(daemon_is_alive(&socket)?, DaemonStatus::Running(_)) {
-        error!("Daemon is already running");
+        warn!("Daemon is already running");
         return Ok(());
     }
 
-    start_daemon(&socket, args.attach)
+    start_daemon(&socket, args.attach)?;
+    lock.free()?;
+
+    Ok(())
 }
 
 #[derive(Parser, Debug)]
@@ -64,13 +66,15 @@ pub fn daemon_restart_execute_with_args(
         global_options.socket_dir.as_deref(),
     )?;
 
-    let _lock = StartupLock::acquire(&socket_dir);
-
+    let lock = StartupLock::acquire(&socket_dir)?;
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
     run_command(DaemonCommands::Stop, global_options, &socket, true)?;
 
-    start_daemon(&socket, args.attach)
+    start_daemon(&socket, args.attach)?;
+    lock.free()?;
+
+    Ok(())
 }
 
 pub fn daemon_execute_with_args(args: DaemonArgs, global_options: GlobalOptions) -> Result<()> {
