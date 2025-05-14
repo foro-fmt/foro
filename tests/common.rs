@@ -4,9 +4,8 @@ use assert_cmd::prelude::*;
 use assert_fs::fixture::ChildPath;
 use assert_fs::prelude::*;
 use std::fs;
-use std::io::{stdout, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Output};
 
 pub enum Cache {
     TempCache(ChildPath),
@@ -122,7 +121,7 @@ impl TestEnv {
         let mut cmd = self.foro_cmd(args);
 
         let res = cmd.output().unwrap();
-        assert!(res.status.success(), "Command failed: {:?}", res);
+        assert!(res.status.success(), "Command failed: {res:?}");
 
         res
     }
@@ -152,6 +151,12 @@ pub struct TestEnvBuilder {
     config_file: Option<PathBuf>,
     cache: Option<CacheKind>,
     socket_dir: Option<PathBuf>,
+}
+
+impl Default for TestEnvBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TestEnvBuilder {

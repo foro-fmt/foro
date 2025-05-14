@@ -1,12 +1,9 @@
-use std::io::Write;
 mod common;
 
-use std::io::stdout;
-use crate::common::{TestEnv, TestEnvBuilder};
+use crate::common::TestEnv;
 use assert_cmd::prelude::*;
 use predicates::str::contains;
 use regex::Regex;
-use serial_test::serial;
 
 #[test]
 fn test_cli_daemon() {
@@ -14,9 +11,10 @@ fn test_cli_daemon() {
 
     let res = env.foro_stderr(&["daemon", "start"]);
     assert!(res.contains("Daemon started"));
-    
+
     let res = env.foro_stdout(&["daemon", "ping"]);
-    let pid_0 = Regex::new(r"daemon pid: (\d+)").unwrap()
+    let pid_0 = Regex::new(r"daemon pid: (\d+)")
+        .unwrap()
         .captures(&res)
         .unwrap()
         .get(1)
@@ -32,13 +30,14 @@ fn test_cli_daemon() {
     res.assert().stderr(contains("Daemon started"));
 
     let res = env.foro_stdout(&["daemon", "ping"]);
-    let pid_1 = Regex::new(r"daemon pid: (\d+)").unwrap()
+    let pid_1 = Regex::new(r"daemon pid: (\d+)")
+        .unwrap()
         .captures(&res)
         .unwrap()
         .get(1)
         .unwrap()
         .as_str();
-    
+
     assert_ne!(pid_0, pid_1);
 
     let mut res = env.foro_cmd(&["daemon", "restart"]);
@@ -46,20 +45,21 @@ fn test_cli_daemon() {
     res.assert().stderr(contains("Daemon started"));
 
     let res = env.foro_stdout(&["daemon", "ping"]);
-    let pid_2 = Regex::new(r"daemon pid: (\d+)").unwrap()
+    let pid_2 = Regex::new(r"daemon pid: (\d+)")
+        .unwrap()
         .captures(&res)
         .unwrap()
         .get(1)
         .unwrap()
         .as_str();
-    
+
     assert_ne!(pid_1, pid_2);
 }
 
 #[test]
 fn test_cli_daemon_lock() {
     let env = TestEnv::new();
-    
+
     let mut proc_0 = env.foro_cmd(&["daemon", "start"]).spawn().unwrap();
     let mut proc_1 = env.foro_cmd(&["daemon", "start"]).spawn().unwrap();
 

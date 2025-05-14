@@ -71,6 +71,7 @@ pub enum DaemonResponse {
 }
 
 pub struct DaemonSocketPath {
+    pub socket_dir: PathBuf,
     pub socket_path: PathBuf,
     pub info_path: PathBuf,
 }
@@ -82,6 +83,7 @@ pub struct DaemonSocketPath {
 impl DaemonSocketPath {
     pub fn from_socket_dir(socket_dir: &Path) -> Self {
         Self {
+            socket_dir: socket_dir.to_path_buf(),
             socket_path: socket_dir.join("daemon-cmd.sock"),
             info_path: socket_dir.join("daemon-cmd.sock.info"),
         }

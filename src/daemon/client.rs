@@ -5,6 +5,7 @@ use crate::daemon::interface::{
     DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath,
 };
 use crate::daemon::server::start_daemon;
+use crate::daemon::startup_lock::StartupLock;
 use crate::daemon::uds::UnixStream;
 use crate::process_utils::{get_start_time, is_alive};
 use anyhow::{anyhow, Context, Result};
@@ -138,13 +139,14 @@ fn run_command_inner(
 pub fn ensure_daemon_running(
     socket: &DaemonSocketPath,
     global_options: &GlobalOptions,
-) -> Result<DaemonStatus> {
+) -> Result<()> {
+    let _lock = StartupLock::acquire(&socket.socket_dir);
+
     let status = daemon_is_alive(socket)?;
 
     match status {
         DaemonStatus::NotRunning => {
             start_daemon(socket, false)?;
-            Ok(daemon_is_alive(socket)?)
         }
         DaemonStatus::Running(ref daemon_build_id) => {
             let current_build_id = get_build_id();
@@ -166,13 +168,12 @@ pub fn ensure_daemon_running(
                     )?;
 
                     start_daemon(socket, false)?;
-                    return daemon_is_alive(socket);
                 }
             }
-
-            Ok(status)
         }
     }
+
+    Ok(())
 }
 
 /// Run a command with the daemon.

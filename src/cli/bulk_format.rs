@@ -1,6 +1,6 @@
 use crate::cli::GlobalOptions;
 use crate::config::load_config_and_socket;
-use crate::daemon::client::run_command as daemon_run_command;
+use crate::daemon::client::{ensure_daemon_running, run_command as daemon_run_command};
 use crate::daemon::interface::{DaemonBulkFormatArgs, DaemonCommands, DaemonSocketPath};
 use anyhow::Result;
 use clap::Parser;
@@ -27,7 +27,7 @@ pub fn bulk_format_execute_with_args(
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
-    crate::daemon::client::ensure_daemon_running(&socket, &global_options)?;
+    ensure_daemon_running(&socket, &global_options)?;
 
     let threads = if args.threads == 0 {
         num_cpus::get()

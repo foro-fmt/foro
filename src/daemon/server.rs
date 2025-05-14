@@ -417,7 +417,7 @@ pub struct WrappedUnixSocket {
 
 impl WrappedUnixSocket {
     pub(crate) fn bind(path: impl AsRef<Path>) -> Result<Self> {
-        let path = path.as_ref().to_path_buf();
+        let path = path.as_ref();
 
         let parent = path.parent().unwrap();
         fs::create_dir_all(parent)?;
@@ -427,11 +427,12 @@ impl WrappedUnixSocket {
             path.file_name().unwrap().to_str().unwrap()
         ));
 
-        let listener = match UnixListener::bind(&path) {
+        let listener = match UnixListener::bind(path) {
             Ok(l) => l,
             Err(err) if err.kind() == ErrorKind::AddrInUse => {
                 let as_daemon_path = DaemonSocketPath {
-                    socket_path: path.clone(),
+                    socket_dir: parent.to_path_buf(),
+                    socket_path: path.to_path_buf(),
                     info_path: info_path.clone(),
                 };
 
@@ -439,7 +440,7 @@ impl WrappedUnixSocket {
                     return Err(anyhow!("Daemon is already running"));
                 } else {
                     info!("Removing dead socket file");
-                    let err = fs::remove_file(&path);
+                    let err = fs::remove_file(path);
                     if let Err(err) = err {
                         warn!("Failed to remove dead socket file: {}", err);
                     }
@@ -447,7 +448,7 @@ impl WrappedUnixSocket {
                     if let Err(err) = err {
                         warn!("Failed to remove dead info file: {}", err);
                     }
-                    UnixListener::bind(&path)?
+                    UnixListener::bind(path)?
                 }
             }
             Err(err) => {
@@ -465,7 +466,10 @@ impl WrappedUnixSocket {
         info!("Listening on: {}", path.display());
         info!("info path: {}", info_path.display());
 
-        Ok(Self { path, listener })
+        Ok(Self {
+            path: path.to_path_buf(),
+            listener,
+        })
     }
 }
 

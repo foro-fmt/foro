@@ -3,6 +3,7 @@ use crate::config::load_config_and_socket;
 use crate::daemon::client::{daemon_is_alive, run_command, DaemonStatus};
 use crate::daemon::interface::{DaemonCommands, DaemonSocketPath};
 use crate::daemon::server::start_daemon;
+use crate::daemon::startup_lock::StartupLock;
 use anyhow::Result;
 use clap::Parser;
 use log::error;
@@ -21,6 +22,8 @@ pub fn daemon_start_execute_with_args(
         global_options.config_file.as_deref(),
         global_options.socket_dir.as_deref(),
     )?;
+
+    let _lock = StartupLock::acquire(&socket_dir);
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
@@ -60,6 +63,8 @@ pub fn daemon_restart_execute_with_args(
         global_options.config_file.as_deref(),
         global_options.socket_dir.as_deref(),
     )?;
+
+    let _lock = StartupLock::acquire(&socket_dir);
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 
