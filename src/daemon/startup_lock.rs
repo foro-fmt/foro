@@ -9,6 +9,9 @@ pub struct StartupLock {
 
 impl StartupLock {
     pub fn acquire(socket_dir: &Path) -> Result<Self> {
+        // Ensure the socket directory exists before trying to create the lock
+        fs::create_dir_all(socket_dir)?;
+
         let path = socket_dir.join("daemon-start.lock");
         let mut taken_lock_started: Option<SystemTime> = None;
 
