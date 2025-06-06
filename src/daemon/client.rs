@@ -112,13 +112,20 @@ pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
 
 fn run_command_inner(
     command: DaemonCommands,
-    global_options: GlobalOptions,
+    mut global_options: GlobalOptions,
     mut stream: UnixStream,
     timeout: Option<Duration>,
 ) -> Result<DaemonResponse> {
+    let cwd = current_dir()?;
+    
+    // Convert relative config_file path to absolute path
+    if let Some(config_file) = global_options.config_file {
+        global_options.config_file = Some(cwd.join(config_file).canonicalize()?);
+    }
+    
     let buf = serde_json::to_vec(&DaemonCommandPayload {
         command,
-        current_dir: current_dir()?,
+        current_dir: cwd,
         global_options,
     })?;
     stream.write_all(&buf)?;
