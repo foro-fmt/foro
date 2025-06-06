@@ -1,8 +1,8 @@
 use crate::config::{CommandWithControlFlow, PureCommand, SomeCommand, WriteCommand};
+use crate::handle_plugin::cache::run_multi_cached;
 use crate::{debug_long, trace_long};
 use anyhow::{anyhow, Context, Result};
-use dll_pack::load::{NativeLibrary, WasmLibrary};
-use dll_pack::{load, run_multi_cached, Library};
+use dll_pack::load::{load, Library, NativeLibrary, WasmLibrary};
 use foro_plugin_utils::data_json_utils::{merge, JsonGetter};
 use log::{debug, trace};
 use minijinja;

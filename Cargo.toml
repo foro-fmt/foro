@@ -1,60 +1,48 @@
 [package]
 name = "foro"
-repository = "https://github.com/nahco314/foro"
 version = "0.1.0"
 edition = "2021"
-
-[profile.super-release]
-inherits = "release"
-opt-level = 3
-codegen-units = 1
-debug = false
-lto = "fat"
-
-# The profile that 'dist' will build with
-[profile.dist]
-inherits = "super-release"
+repository = "https://github.com/nahco314/foro"
 
 [dependencies]
+anstyle = "1.0.10"
 anyhow = "1.0.86"
 clap = { version = "4.5.8", features = ["derive", "string"] }
 clap-verbosity-flag = "2.2.1"
-env_logger = "0.11.3"
-log = "0.4.22"
+dialoguer = "0.11.0"
 dirs = "5.0.1"
+dll-pack = { git = "https://github.com/nahco314/dll-pack", version = "0.3.0" }
+# dll-pack = { path = "../dll-pack" }
+env_logger = "0.11.3"
+foro-plugin-utils = { version = "0.2.0", git = "https://github.com/nahco314/foro-plugin-utils" }
+ignore = "0.4.23"
+libloading = "0.8.5"
+log = "0.4.22"
+minijinja = "2.2.0"
+notify = "6.1.1"
+num_cpus = "1.16.0"
+os_pipe = "1.2.1"
+reqwest = { version = "0.12.7", default-features = false, features = [
+  "blocking",
+  "http2",
+  "rustls-tls",
+] }
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.120"
-url_serde = "0.2.0"
-url = "1.7.2"
-urlencoding = "2.1.3"
-reqwest = { version = "0.12.7", default-features = false, features = ["rustls-tls", "http2", "blocking"] }
-# only the necessary features are extracted to speed up the build process
-wasmtime = { version = "29.0.1", default-features = false, features = ["runtime", "gc", "gc-drc", "threads", "cranelift", "parallel-compilation"] }
-wasmtime-wasi = "29.0.1"
-minijinja = "2.2.0"
-dialoguer = "0.11.0"
-foro-plugin-utils = { git = "https://github.com/nahco314/foro-plugin-utils", version = "0.2.0" }
-os_pipe = "1.2.1"
-notify = "6.1.1"
-libloading = "0.8.5"
 sysinfo = "0.31.4"
-dll-pack = { git = "https://github.com/nahco314/dll-pack", version = "0.2.1" }
-# dll-pack = { path = "../dll-pack" }
-ignore = "0.4.23"
-anstyle = "1.0.10"
-num_cpus = "1.16.0"
-
-[target.'cfg(unix)'.dependencies]
-nix = { version = "0.29.0", features = ["process", "fs", "feature"]}
-shell-words = "1.1.0"
-
-[target.'cfg(target_os = "macos")'.dependencies]
-libc = "0.2.161"
-
-[target.'cfg(windows)'.dependencies]
-winsplit = "0.1.0"
-uds_windows = "1.1.0"
-winapi = { version = "0.3", features = ["winbase", "minwindef", "winnt", "processthreadsapi", "processenv"] }
+url = "1.7.2"
+url_serde = "0.2.0"
+urlencoding = "2.1.3"
+# only the necessary features are extracted to speed up the build process
+wasmtime = { version = "29.0.1", default-features = false, features = [
+  "cranelift",
+  "gc",
+  "gc-drc",
+  "parallel-compilation",
+  "runtime",
+  "threads",
+] }
+wasmtime-wasi = "29.0.1"
 
 [dev-dependencies]
 assert_cmd = "2.0.17"
@@ -68,5 +56,34 @@ tempfile = "3.17.1"
 [build-dependencies]
 built = "0.7.7"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2.161"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.29.0", features = ["process", "fs", "feature"] }
+shell-words = "1.1.0"
+
+[target.'cfg(windows)'.dependencies]
+winsplit = "0.1.0"
+uds_windows = "1.1.0"
+winapi = { version = "0.3", features = [
+  "winbase",
+  "minwindef",
+  "winnt",
+  "processthreadsapi",
+  "processenv",
+] }
+
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage_nightly)"] }
+
+[profile.super-release]
+inherits = "release"
+opt-level = 3
+codegen-units = 1
+debug = false
+lto = "fat"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "super-release"
