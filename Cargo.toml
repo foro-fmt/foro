@@ -2,7 +2,7 @@
 name = "foro"
 version = "0.1.0"
 edition = "2021"
-repository = "https://github.com/nahco314/foro"
+repository = "https://github.com/foro-fmt/foro"
 
 [dependencies]
 anstyle = "1.0.10"
@@ -11,10 +11,10 @@ clap = { version = "4.5.8", features = ["derive", "string"] }
 clap-verbosity-flag = "2.2.1"
 dialoguer = "0.11.0"
 dirs = "5.0.1"
-dll-pack = { git = "https://github.com/nahco314/dll-pack", version = "0.3.0" }
+dll-pack = { git = "https://github.com/foro-fmt/dll-pack", version = "0.3.0" }
 # dll-pack = { path = "../dll-pack" }
 env_logger = "0.11.3"
-foro-plugin-utils = { version = "0.2.0", git = "https://github.com/nahco314/foro-plugin-utils" }
+foro-plugin-utils = { version = "0.2.0", git = "https://github.com/foro-fmt/foro-plugin-utils" }
 ignore = "0.4.23"
 libloading = "0.8.5"
 log = "0.4.22"

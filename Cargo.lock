@@ -653,7 +653,7 @@ dependencies = [
 [[package]]
 name = "dll-pack"
 version = "0.3.0"
-source = "git+https://github.com/nahco314/dll-pack#36bcd8c586b8610dae0bd2a127a83b4108bbad01"
+source = "git+https://github.com/foro-fmt/dll-pack#36bcd8c586b8610dae0bd2a127a83b4108bbad01"
 dependencies = [
  "anyhow",
  "libloading",
@@ -874,8 +874,8 @@ dependencies = [
 
 [[package]]
 name = "foro-plugin-utils"
-version = "0.2.0"
-source = "git+https://github.com/nahco314/foro-plugin-utils#17a4bc23175516059862b78ac91dc33afa4d3620"
+version = "0.2.1"
+source = "git+https://github.com/foro-fmt/foro-plugin-utils#4d480ac05a888c6972893ae5c8baa06069a5c543"
 dependencies = [
  "anyhow",
  "serde_json",
