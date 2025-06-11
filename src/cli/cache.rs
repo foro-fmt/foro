@@ -78,6 +78,9 @@ pub fn cache_remove_execute_with_args(
 
     #[cfg(windows)]
     {
+        use std::thread::sleep;
+        use std::time::Duration;
+
         // todo: Even with this, errors still occur occasionally,
         //   so we must use IPC to ensure that wait.
         sleep(Duration::from_millis(10));
