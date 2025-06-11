@@ -9,6 +9,7 @@ use crate::daemon::interface::{
     DaemonFormatArgs, DaemonFormatResponse, DaemonInfo, DaemonPureFormatArgs,
     DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath, OutputPath,
 };
+use crate::daemon::startup_lock::StartupLock;
 use crate::daemon::uds::{UnixListener, UnixStream};
 use crate::debug_long;
 use crate::handle_plugin::run::{run, run_pure};
@@ -697,7 +698,7 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
 ///
 /// If `attach` is true, the daemon will run in the current process.
 /// If `attach` is false, the daemon will run in a separate process.
-pub fn start_daemon(socket: &DaemonSocketPath, attach: bool) -> Result<()> {
+pub fn start_daemon(socket: &DaemonSocketPath, lock: StartupLock, attach: bool) -> Result<()> {
     info!("Starting daemon (attach: {})", attach);
 
     if attach {
@@ -720,9 +721,13 @@ pub fn start_daemon(socket: &DaemonSocketPath, attach: bool) -> Result<()> {
             .unwrap();
 
         let listener = WrappedUnixSocket::bind(&socket.socket_path)?;
+
+        lock.free()?;
+
         daemon_main(listener);
     } else {
         start_daemon_no_attach(socket)?;
+        lock.free()?;
     }
 
     Ok(())

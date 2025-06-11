@@ -117,12 +117,12 @@ fn run_command_inner(
     timeout: Option<Duration>,
 ) -> Result<DaemonResponse> {
     let cwd = current_dir()?;
-    
+
     // Convert relative config_file path to absolute path
     if let Some(config_file) = global_options.config_file {
         global_options.config_file = Some(cwd.join(config_file).canonicalize()?);
     }
-    
+
     let buf = serde_json::to_vec(&DaemonCommandPayload {
         command,
         current_dir: cwd,
@@ -153,7 +153,7 @@ pub fn ensure_daemon_running(
 
     match status {
         DaemonStatus::NotRunning => {
-            start_daemon(socket, false)?;
+            start_daemon(socket, lock, false)?;
         }
         DaemonStatus::Running(ref daemon_build_id) => {
             let current_build_id = get_build_id();
@@ -174,13 +174,11 @@ pub fn ensure_daemon_running(
                         None,
                     )?;
 
-                    start_daemon(socket, false)?;
+                    start_daemon(socket, lock, false)?;
                 }
             }
         }
     }
-
-    lock.free()?;
 
     Ok(())
 }

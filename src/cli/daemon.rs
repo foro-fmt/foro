@@ -31,8 +31,7 @@ pub fn daemon_start_execute_with_args(
         return Ok(());
     }
 
-    start_daemon(&socket, args.attach)?;
-    lock.free()?;
+    start_daemon(&socket, lock, args.attach)?;
 
     Ok(())
 }
@@ -71,8 +70,7 @@ pub fn daemon_restart_execute_with_args(
 
     run_command(DaemonCommands::Stop, global_options, &socket, true)?;
 
-    start_daemon(&socket, args.attach)?;
-    lock.free()?;
+    start_daemon(&socket, lock, args.attach)?;
 
     Ok(())
 }
