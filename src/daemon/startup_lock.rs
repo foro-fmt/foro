@@ -46,7 +46,7 @@ impl StartupLock {
     fn _free(&mut self) -> Result<()> {
         if let Some(p) = self.path.take() {
             fs::remove_dir_all(&p)?;
-            info!("startup-lock released explicitly");
+            debug!("startup-lock released explicitly");
         }
         Ok(())
     }

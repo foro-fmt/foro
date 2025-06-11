@@ -11,7 +11,7 @@ clap = { version = "4.5.8", features = ["derive", "string"] }
 clap-verbosity-flag = "2.2.1"
 dialoguer = "0.11.0"
 dirs = "5.0.1"
-dll-pack = { git = "https://github.com/foro-fmt/dll-pack", version = "0.3.0" }
+dll-pack = { version = "0.3.0", git = "https://github.com/foro-fmt/dll-pack" }
 # dll-pack = { path = "../dll-pack" }
 env_logger = "0.11.3"
 foro-plugin-utils = { version = "0.2.0", git = "https://github.com/foro-fmt/foro-plugin-utils" }
