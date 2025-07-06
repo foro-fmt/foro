@@ -1,6 +1,6 @@
 use crate::cli::GlobalOptions;
 use crate::config::get_or_create_default_config;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -97,10 +97,10 @@ pub fn config_edit_execute_with_args(
     let status = std::process::Command::new(&editor)
         .arg(&config_file)
         .status()
-        .with_context(|| format!("Failed to execute editor: {}", editor))?;
+        .with_context(|| format!("Failed to execute editor: {editor}"))?;
 
     if !status.success() {
-        anyhow::bail!("Editor exited with non-zero status: {}", status);
+        return Err(anyhow!("Editor exited with non-zero status: {}", status));
     }
 
     Ok(())
