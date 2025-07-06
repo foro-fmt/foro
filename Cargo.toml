@@ -80,9 +80,9 @@ unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage_nightly)"] }
 [profile.super-release]
 inherits = "release"
 opt-level = 3
-codegen-units = 1
 debug = false
 lto = "fat"
+codegen-units = 1
 
 # The profile that 'dist' will build with
 [profile.dist]
