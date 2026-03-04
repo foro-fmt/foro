@@ -642,13 +642,25 @@ fn wait_for_daemon_ready(
 fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
     use std::env;
     use std::os::windows::io::{AsHandle, AsRawHandle};
-    use winapi::um::processenv::SetStdHandle;
-    use winapi::um::winbase::{STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
+    use winapi::um::handleapi::{SetHandleInformation, INVALID_HANDLE_VALUE};
+    use winapi::um::processenv::{GetStdHandle, SetStdHandle};
+    use winapi::um::winbase::{HANDLE_FLAG_INHERIT, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
     use winapi::um::winnt::HANDLE;
 
     if !env::var("FORO_WINDOWS_IS_DAEMON").is_ok() {
         let current_exe = env::current_exe()?;
         let args: Vec<String> = env::args().skip(1).collect();
+
+        // Prevent child process from inheriting caller pipes (used by `Command::output()`).
+        // If inherited, test process can block forever waiting for EOF.
+        unsafe {
+            for std_handle in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
+                let handle = GetStdHandle(std_handle);
+                if !handle.is_null() && handle != INVALID_HANDLE_VALUE {
+                    let _ = SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0);
+                }
+            }
+        }
 
         let mut child = process::Command::new(current_exe)
             .args(args)
