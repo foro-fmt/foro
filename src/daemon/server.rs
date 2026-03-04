@@ -649,7 +649,6 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
 
     if !env::var("FORO_WINDOWS_IS_DAEMON").is_ok() {
         let current_exe = env::current_exe()?;
-        let args: Vec<String> = env::args().skip(1).collect();
 
         // Prevent child process from inheriting caller pipes (used by `Command::output()`).
         // If inherited, test process can block forever waiting for EOF.
@@ -663,7 +662,10 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
         }
 
         let mut child = process::Command::new(current_exe)
-            .args(args)
+            .arg("daemon")
+            .arg("start")
+            .arg("--socket-dir")
+            .arg(&socket.socket_dir)
             .env("FORO_WINDOWS_IS_DAEMON", "1")
             .stdin(process::Stdio::null())
             .stdout(process::Stdio::null())
