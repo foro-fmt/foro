@@ -21,7 +21,7 @@ all_commands = [
         Path("./biome-test"),
         [
             "npx biome format --write ./src/{size}.tsx",
-            "./node_modules/@biomejs/cli-linux-x64-musl/biome format --write ./src/{size}.tsx",
+            "./node_modules/@biomejs/cli-linux-x64/biome format --write ./src/{size}.tsx",
             "{foro} format ./src/{size}.tsx",
         ],
     ),

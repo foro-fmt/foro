@@ -729,9 +729,7 @@ export type BuffData = {
     value: string
 }
 
-export default function CalcUI(props: {
-    ignoreWeakBuff: boolean
-}) {
+export default function CalcUI(props: { ignoreWeakBuff: boolean }) {
     const [searchParam, setSearchParam] = useSearchParams()
 
     let sBuffDataList, sSomeData

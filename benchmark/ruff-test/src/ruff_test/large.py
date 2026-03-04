@@ -1154,14 +1154,12 @@ def _fspath(path):
             raise
         else:
             raise TypeError(
-                "expected str, bytes or os.PathLike object, "
-                "not " + path_type.__name__
+                "expected str, bytes or os.PathLike object, not " + path_type.__name__
             )
     except TypeError:
         if path_type.__fspath__ is None:
             raise TypeError(
-                "expected str, bytes or os.PathLike object, "
-                "not " + path_type.__name__
+                "expected str, bytes or os.PathLike object, not " + path_type.__name__
             ) from None
         else:
             raise
@@ -1169,7 +1167,7 @@ def _fspath(path):
         return path_repr
     else:
         raise TypeError(
-            "expected {}.__fspath__() to return str or bytes, " "not {}".format(
+            "expected {}.__fspath__() to return str or bytes, not {}".format(
                 path_type.__name__, type(path_repr).__name__
             )
         )
