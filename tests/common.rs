@@ -81,8 +81,12 @@ impl TestEnv {
     }
 
     pub fn assert_eq<P: AsRef<Path>>(&self, actual: P, expected: P) {
-        let actual = String::from_utf8(fs::read(self.child(actual)).unwrap()).unwrap();
-        let expected = String::from_utf8(fs::read(self.child(expected)).unwrap()).unwrap();
+        let actual = String::from_utf8(fs::read(self.child(actual)).unwrap())
+            .unwrap()
+            .replace("\r\n", "\n");
+        let expected = String::from_utf8(fs::read(self.child(expected)).unwrap())
+            .unwrap()
+            .replace("\r\n", "\n");
 
         assert_eq!(
             actual, expected,
@@ -208,10 +212,17 @@ impl TestEnvBuilder {
 
         let work_dir = temp_dir.child(self.work_dir.unwrap_or(PathBuf::from(".")));
         let config_file = temp_dir.child(self.config_file.unwrap_or(PathBuf::from("foro.json")));
-        let cache = self
-            .cache
-            .unwrap_or(CacheKind::GlobalCache)
-            .build(&temp_dir);
+        let cache_kind = match self.cache {
+            Some(cache) => cache,
+            None => {
+                if cfg!(windows) {
+                    CacheKind::TempCache(PathBuf::from("cache"))
+                } else {
+                    CacheKind::GlobalCache
+                }
+            }
+        };
+        let cache = cache_kind.build(&temp_dir);
         let socket_dir = temp_dir.child(self.socket_dir.unwrap_or(PathBuf::from("socket")));
 
         let res = TestEnv {
