@@ -10,6 +10,12 @@ pub struct StartupLock {
 }
 
 impl StartupLock {
+    #[cfg(windows)]
+    /// Create a no-op lock holder used when startup lock is managed externally.
+    pub fn noop() -> Self {
+        Self { path: None }
+    }
+
     pub fn acquire(socket_dir: &Path) -> Result<Self> {
         // Ensure the socket directory exists before trying to create the lock
         fs::create_dir_all(socket_dir)?;

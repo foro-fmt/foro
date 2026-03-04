@@ -23,8 +23,16 @@ pub fn daemon_start_execute_with_args(
         global_options.socket_dir.as_deref(),
     )?;
 
-    let lock = StartupLock::acquire(&socket_dir)?;
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
+
+    #[cfg(windows)]
+    if std::env::var("FORO_WINDOWS_IS_DAEMON").is_ok() {
+        // Child process spawned by `start_daemon_no_attach` should not re-enter
+        // startup-lock/daemon-state checks; parent process already handles them.
+        return start_daemon(&socket, StartupLock::noop(), args.attach);
+    }
+
+    let lock = StartupLock::acquire(&socket_dir)?;
 
     if matches!(daemon_is_alive(&socket)?, DaemonStatus::Running(_)) {
         warn!("Daemon is already running");
@@ -65,8 +73,14 @@ pub fn daemon_restart_execute_with_args(
         global_options.socket_dir.as_deref(),
     )?;
 
-    let lock = StartupLock::acquire(&socket_dir)?;
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
+
+    #[cfg(windows)]
+    if std::env::var("FORO_WINDOWS_IS_DAEMON").is_ok() {
+        return start_daemon(&socket, StartupLock::noop(), args.attach);
+    }
+
+    let lock = StartupLock::acquire(&socket_dir)?;
 
     run_command(DaemonCommands::Stop, global_options, &socket, true)?;
 
