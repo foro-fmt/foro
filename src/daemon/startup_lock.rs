@@ -3,6 +3,8 @@ use log::{debug, info, warn};
 use std::time::SystemTime;
 use std::{fs, io, path::Path, path::PathBuf, thread, time::Duration};
 
+const STARTUP_LOCK_STALE_TIMEOUT: Duration = Duration::from_secs(30);
+
 pub struct StartupLock {
     path: Option<PathBuf>,
 }
@@ -28,7 +30,7 @@ impl StartupLock {
                             info!("startup-lock held, waiting...");
                         }
                         Some(t) => {
-                            if t.elapsed()?.as_secs_f32() > 1.0 {
+                            if t.elapsed()? > STARTUP_LOCK_STALE_TIMEOUT {
                                 warn!("startup-lock stale, releasing...");
                                 let _ = fs::remove_dir_all(&path);
                                 continue;
