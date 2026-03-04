@@ -47,6 +47,7 @@ pub(crate) type DefaultAppDirResolver = windows_resolver::WindowsAppDirResolver;
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn test_app_dir_paths() {
         let r = DefaultAppDirResolver {};
@@ -62,5 +63,23 @@ mod tests {
 
         let log = r.log_dir_res().unwrap();
         assert!(log.ends_with("foro/log"));
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn test_app_dir_paths() {
+        let r = DefaultAppDirResolver {};
+
+        let cfg = r.config_file_res().unwrap();
+        assert!(cfg.ends_with("foro.json"));
+
+        let cache = r.cache_dir_res().unwrap();
+        assert!(cache.ends_with("foro"));
+
+        let sock = r.socket_dir_res().unwrap();
+        assert!(sock.ends_with("foro-socket-tmp"));
+
+        let log = r.log_dir_res().unwrap();
+        assert!(log.ends_with("foro-socket-tmp/log"));
     }
 }
