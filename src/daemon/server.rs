@@ -680,7 +680,7 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
         info!("Daemon started");
 
         // Wait until the daemon is truly ready (socket bound and pingable).
-        wait_for_daemon_ready(socket, child, Duration::from_secs(3))?;
+        wait_for_daemon_ready(socket, child, Duration::from_secs(15))?;
 
         return Ok(());
     }
