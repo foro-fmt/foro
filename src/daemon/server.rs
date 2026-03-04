@@ -603,6 +603,42 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
 }
 
 #[cfg(windows)]
+fn wait_for_daemon_ready(
+    socket: &DaemonSocketPath,
+    child: &mut process::Child,
+    timeout: Duration,
+) -> Result<()> {
+    let started = Instant::now();
+    let mut last_ping_error: Option<anyhow::Error> = None;
+
+    while started.elapsed() < timeout {
+        match ping(socket) {
+            Ok(true) => return Ok(()),
+            Ok(false) => {}
+            Err(err) => {
+                last_ping_error = Some(err);
+            }
+        }
+
+        if let Some(status) = child.try_wait()? {
+            let mut message = format!("Failed to start daemon: child exited early ({status})");
+            if let Some(err) = last_ping_error {
+                message.push_str(&format!(", last ping error: {err:#}"));
+            }
+            return Err(anyhow!(message));
+        }
+
+        sleep(Duration::from_millis(10));
+    }
+
+    let mut message = "Failed to start daemon: timeout waiting for daemon readiness".to_string();
+    if let Some(err) = last_ping_error {
+        message.push_str(&format!(", last ping error: {err:#}"));
+    }
+    Err(anyhow!(message))
+}
+
+#[cfg(windows)]
 fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
     use std::env;
     use std::os::windows::io::{AsHandle, AsRawHandle};
@@ -614,25 +650,25 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
         let current_exe = env::current_exe()?;
         let args: Vec<String> = env::args().skip(1).collect();
 
-        let res = process::Command::new(current_exe)
+        let mut child = process::Command::new(current_exe)
             .args(args)
             .env("FORO_WINDOWS_IS_DAEMON", "1")
+            .stdin(process::Stdio::null())
+            .stdout(process::Stdio::null())
+            .stderr(process::Stdio::null())
             .spawn();
 
-        if let Err(err) = res {
+        if let Err(err) = child {
             error!("Failed to start daemon: {}", err);
             return Err(anyhow!("Failed to start daemon: {}", err));
         }
 
+        let child = child.as_mut().unwrap();
+
         info!("Daemon started");
 
-        // In Windows, it takes a little while for the process to start,
-        // and if you try to connect during that time, we will get an error,
-        // so sleep a little
-
-        // todo: Even with this, errors still occur occasionally,
-        //   so we must use IPC to ensure that wait.
-        sleep(Duration::from_millis(10));
+        // Wait until the daemon is truly ready (socket bound and pingable).
+        wait_for_daemon_ready(socket, child, Duration::from_secs(3))?;
 
         return Ok(());
     }
