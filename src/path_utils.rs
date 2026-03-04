@@ -91,18 +91,26 @@ mod tests {
     #[cfg_attr(not(windows), ignore)]
     #[test]
     fn test_normalize_path_windows() {
+        let pwd = std::env::current_dir().unwrap();
+        let canonical = pwd.canonicalize().unwrap();
+        let canonical_str = canonical.to_str().unwrap();
+
         assert_eq!(
-            normalize_path(Path::new(r"C:\Users\test")).unwrap(),
-            r"C:\Users\test"
+            normalize_path(&pwd).unwrap(),
+            strip_windows_path(canonical_str).unwrap()
         );
     }
 
     #[cfg_attr(not(windows), ignore)]
     #[test]
     fn test_to_wasm_path_windows() {
+        let pwd = std::env::current_dir().unwrap();
+        let canonical = pwd.canonicalize().unwrap();
+        let canonical_str = canonical.to_str().unwrap();
+
         assert_eq!(
-            to_wasm_path(Path::new(r"C:\Users\test")).unwrap(),
-            r"/c/Users/test"
+            to_wasm_path(&pwd).unwrap(),
+            convert_windows_path(canonical_str).unwrap()
         );
     }
 

@@ -542,10 +542,12 @@ mod tests {
 
     #[test]
     fn test_error_handling_in_get_or_create_default_config_with() -> Result<()> {
+        let temp_dir = tempdir()?;
+        let non_dir_parent = temp_dir.path().join("non_dir_parent");
+        fs::write(&non_dir_parent, "not a directory")?;
+
         let resolver = MockResolver {
-            config_path: Some(PathBuf::from(
-                "/nonexistent/directory/that/should/not/exist/config.json",
-            )),
+            config_path: Some(non_dir_parent.join("config.json")),
             cache_path: None,
             socket_path: None,
             log_path: None,
