@@ -50,4 +50,4 @@ jobs:
           override: true
       - uses: swatinem/rust-cache@v2
       - name: Run tests
-        run: cargo test --workspace --all-features --locked --verbose
+        run: cargo test --workspace --all-features --locked --verbose -- --test-threads=1
