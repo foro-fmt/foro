@@ -346,6 +346,64 @@ If `dll-pack-builder` itself needs fixing:
 3. Push to that repo.
 4. Update the pinned commit in both `release-verify.yml` and `release.yml` of the affected plugin.
 
+## Step 8: Update the foro Repository Itself
+
+After all plugin releases are published, the foro repo must be updated to reference the new versions. This step is easy to forget — do it before closing the session.
+
+### 8a. Update `src/config/default_config.json`
+
+Each plugin entry has a hardcoded `.dllpack` URL containing the version tag. Bump each URL that was updated.
+
+```json
+{
+  "rules": [
+    {
+      "on": [".ts", ".tsx", ".js", ...],
+      "cmd": "https://github.com/foro-fmt/foro-biome/releases/download/<NEW_TAG>/foro-biome.dllpack"
+    },
+    {
+      "on": ".rs",
+      "cmd": "https://github.com/foro-fmt/foro-rustfmt/releases/download/<NEW_TAG>/foro-rustfmt.dllpack"
+    },
+    ...
+  ]
+}
+```
+
+Edit `src/config/default_config.json` and replace the old tag in each URL with the new tag.
+
+### 8b. Update Test Fixtures
+
+If the new plugin version produces different output for the same input, the expected output files in `tests/fixtures/` must be updated to match.
+
+Run the format tests locally after updating `default_config.json` to see which fixtures (if any) differ:
+
+```bash
+cargo test --test cli_format 2>&1 | grep -A 20 "thread .* panicked"
+```
+
+For each fixture that differs, run foro on the input file and capture the new expected output:
+
+```bash
+# Example: regenerate a fixture
+cargo run -- format tests/fixtures/<plugin>/input.<ext>
+cp tests/fixtures/<plugin>/input.<ext> tests/fixtures/<plugin>/output.<ext>
+```
+
+Review the diff carefully before committing — a formatter behavior change should be intentional.
+
+### 8c. Commit and Push
+
+```bash
+git add src/config/default_config.json tests/fixtures/
+git commit -m "chore(plugins): bump plugin versions to <summary>"
+git push
+```
+
+Verify CI passes on the foro repo before considering the update complete.
+
+---
+
 ## Example: Updating All Plugins (Full Session)
 
 ```bash
