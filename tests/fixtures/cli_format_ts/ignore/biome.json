@@ -1,10 +1,5 @@
 {
-	"overrides": [
-		{
-			"includes": ["main.ts"],
-			"formatter": {
-				"enabled": false
-			}
-		}
-	]
+	"files": {
+		"ignore": ["main.ts"]
+	}
 }
