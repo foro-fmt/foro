@@ -644,7 +644,9 @@ fn start_daemon_no_attach(socket: &DaemonSocketPath) -> Result<()> {
     use std::os::windows::io::{AsHandle, AsRawHandle};
     use winapi::um::handleapi::{SetHandleInformation, INVALID_HANDLE_VALUE};
     use winapi::um::processenv::{GetStdHandle, SetStdHandle};
-    use winapi::um::winbase::{HANDLE_FLAG_INHERIT, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE};
+    use winapi::um::winbase::{
+        HANDLE_FLAG_INHERIT, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+    };
     use winapi::um::winnt::HANDLE;
 
     if !env::var("FORO_WINDOWS_IS_DAEMON").is_ok() {

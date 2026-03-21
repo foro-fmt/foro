@@ -12,7 +12,10 @@ fn test_cli_format_rust_basic() {
 }
 
 #[test]
-#[cfg_attr(target_os = "windows", ignore = "rustfmt ignore handling is unstable on windows plugin")]
+#[cfg_attr(
+    target_os = "windows",
+    ignore = "rustfmt ignore handling is unstable on windows plugin"
+)]
 fn test_cli_format_rust_ignore() {
     let env = TestEnv::new_fixture("./tests/fixtures/cli_format_rust/ignore/");
 
