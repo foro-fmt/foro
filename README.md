@@ -319,7 +319,7 @@ Error: cannot allocate memory in static TLS block
 
 **Cause:** `librustc_driver.so` uses the `initial-exec` TLS model extensively. When loaded via `dlopen` at runtime, glibc must fit the library's thread-local storage into a fixed-size static TLS block reserved at process startup. Newer versions of rustc use more TLS, and starting from 1.95.0-nightly the block is exhausted on typical systems.
 
-**Workaround:** The default configuration currently pins `foro-rustfmt` to version 0.4.7 (based on rustc 1.83.0-nightly), which does not exhibit this problem.
+**Workaround:** The default configuration currently pins `foro-rustfmt` to version 1.8.0 (based on rustc 1.83.0-nightly / nightly-2024-09-10), which does not exhibit this problem.
 
 **Long-term fix:** Being tracked — likely requires a worker-process architecture to load `librustc_driver` in an isolated process with a fresh address space.
 
