@@ -304,6 +304,27 @@ Here's a quick overview of `foro`'s commands:
 
 For detailed help on any command, use `foro <command> --help`.
 
+## ⚠️ Known Issues
+
+### Rust formatting unavailable on Linux with recent foro-rustfmt versions
+
+**Status:** Under investigation
+**Affected:** Linux (glibc) with `foro-rustfmt` ≥ 1.9.0 (which bundles rustc 1.95.0-nightly's `librustc_driver`)
+
+**Symptom:**
+
+```
+Error: cannot allocate memory in static TLS block
+```
+
+**Cause:** `librustc_driver.so` uses the `initial-exec` TLS model extensively. When loaded via `dlopen` at runtime, glibc must fit the library's thread-local storage into a fixed-size static TLS block reserved at process startup. Newer versions of rustc use more TLS, and starting from 1.95.0-nightly the block is exhausted on typical systems.
+
+**Workaround:** The default configuration currently pins `foro-rustfmt` to version 0.4.7 (based on rustc 1.83.0-nightly), which does not exhibit this problem.
+
+**Long-term fix:** Being tracked — likely requires a worker-process architecture to load `librustc_driver` in an isolated process with a fresh address space.
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome\! Whether it's bug reports, feature requests, documentation improvements, or code contributions, please feel free to open an issue or pull request.

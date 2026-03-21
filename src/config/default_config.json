@@ -6,7 +6,7 @@
 		},
 		{
 			"on": ".rs",
-			"cmd": "https://github.com/foro-fmt/foro-rustfmt/releases/download/1.9.0/foro-rustfmt.dllpack"
+			"cmd": "https://github.com/foro-fmt/foro-rustfmt/releases/download/0.4.7/foro-rustfmt.dllpack"
 		},
 		{
 			"on": ".py",
