@@ -1,6 +1,6 @@
 [package]
 name = "foro"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 repository = "https://github.com/foro-fmt/foro"
 
