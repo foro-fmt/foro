@@ -10,6 +10,7 @@ mod cli;
 mod config;
 mod daemon;
 mod handle_plugin;
+mod install_check;
 mod log;
 mod path_utils;
 mod process_utils;

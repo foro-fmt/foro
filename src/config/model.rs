@@ -101,6 +101,54 @@ fn none<T>() -> Option<T> {
     None
 }
 
+fn collect_urls_from_pure_cmd(cmd: &CommandWithControlFlow<PureCommand>, urls: &mut Vec<Url>) {
+    match cmd {
+        CommandWithControlFlow::Command(PureCommand::PluginUrl(url)) => urls.push(url.clone()),
+        CommandWithControlFlow::Command(PureCommand::CommandIO { .. }) => {}
+        CommandWithControlFlow::Sequential(cmds) => {
+            for c in cmds {
+                collect_urls_from_pure_cmd(c, urls);
+            }
+        }
+        CommandWithControlFlow::If {
+            run,
+            on_true,
+            on_false,
+            ..
+        } => {
+            collect_urls_from_pure_cmd(run, urls);
+            collect_urls_from_pure_cmd(on_true, urls);
+            collect_urls_from_pure_cmd(on_false, urls);
+        }
+        CommandWithControlFlow::Set { .. } => {}
+    }
+}
+
+fn collect_urls_from_write_cmd(cmd: &CommandWithControlFlow<WriteCommand>, urls: &mut Vec<Url>) {
+    match cmd {
+        CommandWithControlFlow::Command(WriteCommand::Pure(PureCommand::PluginUrl(url))) => {
+            urls.push(url.clone())
+        }
+        CommandWithControlFlow::Command(_) => {}
+        CommandWithControlFlow::Sequential(cmds) => {
+            for c in cmds {
+                collect_urls_from_write_cmd(c, urls);
+            }
+        }
+        CommandWithControlFlow::If {
+            run,
+            on_true,
+            on_false,
+            ..
+        } => {
+            collect_urls_from_write_cmd(run, urls);
+            collect_urls_from_write_cmd(on_true, urls);
+            collect_urls_from_write_cmd(on_false, urls);
+        }
+        CommandWithControlFlow::Set { .. } => {}
+    }
+}
+
 impl Config {
     pub fn find_matched_rule(&self, target_path: &Path, force_pure: bool) -> Option<Rule> {
         for rule in &self.rules {
@@ -110,6 +158,19 @@ impl Config {
         }
 
         None
+    }
+
+    pub fn all_plugin_urls(&self) -> Vec<Url> {
+        let mut urls = Vec::new();
+        for rule in &self.rules {
+            match &rule.some_cmd {
+                SomeCommand::Pure { cmd } => collect_urls_from_pure_cmd(cmd, &mut urls),
+                SomeCommand::Write { write_cmd } => {
+                    collect_urls_from_write_cmd(write_cmd, &mut urls)
+                }
+            }
+        }
+        urls
     }
 }
 

@@ -70,6 +70,22 @@ impl TestEnv {
         if !self.socket_dir.exists() {
             self.socket_dir.create_dir_all().unwrap();
         }
+
+        self.foro(&["install"]);
+    }
+
+    fn construct_bare(&self) {
+        if !self.config_file.exists() {
+            let default_config = self.raw_foro(&["config", "default"]).unwrap().stdout;
+
+            self.config_file.write_binary(&default_config).unwrap();
+        }
+
+        self.cache.ensure_dir();
+
+        if !self.socket_dir.exists() {
+            self.socket_dir.create_dir_all().unwrap();
+        }
     }
 
     pub fn child<P: AsRef<Path>>(&self, path: P) -> ChildPath {
@@ -211,6 +227,19 @@ impl TestEnvBuilder {
     }
 
     pub fn build(self) -> TestEnv {
+        let env = self.build_inner();
+        env.construct();
+        env
+    }
+
+    /// Build without running `foro install`. Used for testing install behavior.
+    pub fn build_without_install(self) -> TestEnv {
+        let env = self.build_inner();
+        env.construct_bare();
+        env
+    }
+
+    fn build_inner(self) -> TestEnv {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         if let Some(path) = &self.fixture_path {
             temp_dir.copy_from(path, &["**"]).unwrap();
@@ -231,16 +260,12 @@ impl TestEnvBuilder {
         let cache = cache_kind.build(&temp_dir);
         let socket_dir = temp_dir.child(self.socket_dir.unwrap_or(PathBuf::from("socket")));
 
-        let res = TestEnv {
+        TestEnv {
             temp_dir,
             work_dir,
             config_file,
             cache,
             socket_dir,
-        };
-
-        res.construct();
-
-        res
+        }
     }
 }

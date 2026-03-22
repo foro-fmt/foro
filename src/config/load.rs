@@ -134,6 +134,15 @@ pub(crate) fn get_or_create_default_config() -> Option<PathBuf> {
     get_or_create_default_config_with(&DefaultAppDirResolver {})
 }
 
+pub(crate) fn read_config_bytes(given_config_file: Option<&Path>) -> Result<Vec<u8>> {
+    let config_file = match given_config_file {
+        Some(p) => p.to_path_buf(),
+        None => get_or_create_default_config().context("Failed to get config directory")?,
+    };
+    fs::read(&config_file)
+        .with_context(|| format!("Failed to read config file ({:?})", &config_file))
+}
+
 pub(crate) fn load_config_and_cache(
     given_config_file: Option<&Path>,
     given_cache_dir: Option<&Path>,

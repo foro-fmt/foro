@@ -1,10 +1,11 @@
 use crate::cli::GlobalOptions;
-use crate::config::load_config_and_socket;
+use crate::config::{load_paths, read_config_bytes};
 use crate::daemon::client::{ensure_daemon_running, run_command as daemon_run_command};
 use crate::daemon::interface::{
     DaemonBulkFormatArgs, DaemonCommands, DaemonFormatArgs, DaemonSocketPath,
 };
-use anyhow::Result;
+use crate::install_check::check_ready;
+use anyhow::{Context, Result};
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -19,10 +20,14 @@ pub struct FormatArgs {
 }
 
 pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions) -> Result<()> {
-    let (_, socket_dir) = load_config_and_socket(
+    let config_bytes = read_config_bytes(global_options.config_file.as_deref())?;
+    let (_, cache_dir, socket_dir) = load_paths(
         global_options.config_file.as_deref(),
+        global_options.cache_dir.as_deref(),
         global_options.socket_dir.as_deref(),
     )?;
+    check_ready(&config_bytes, &cache_dir)
+        .context("Run `foro install` to download plugins before formatting")?;
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
 

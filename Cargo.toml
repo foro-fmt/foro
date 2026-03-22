@@ -11,8 +11,8 @@ clap = { version = "4.5.8", features = ["derive", "string"] }
 clap-verbosity-flag = "2.2.1"
 dialoguer = "0.11.0"
 dirs = "5.0.1"
-dll-pack = { version = "0.3.0", git = "https://github.com/foro-fmt/dll-pack", rev = "59ca3e90cf8ccd362d8b002915079a63b489bef8" }
-# dll-pack = { path = "../dll-pack" }
+# dll-pack = { version = "0.3.0", git = "https://github.com/foro-fmt/dll-pack", rev = "59ca3e90cf8ccd362d8b002915079a63b489bef8" }
+dll-pack = { path = "../dll-pack" }
 env_logger = "0.11.3"
 foro-plugin-utils = { version = "0.2.0", git = "https://github.com/foro-fmt/foro-plugin-utils" }
 ignore = "0.4.23"
@@ -33,6 +33,7 @@ sysinfo = "0.31.4"
 url = "1.7.2"
 url_serde = "0.2.0"
 urlencoding = "2.1.3"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
 # only the necessary features are extracted to speed up the build process
 wasmtime = { version = "29.0.1", default-features = false, features = [
   "cranelift",

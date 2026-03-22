@@ -7,6 +7,7 @@ mod cache;
 mod config;
 mod daemon;
 mod format;
+mod install;
 mod internal;
 
 use format::*;
@@ -14,6 +15,7 @@ use format::*;
 use crate::cli::cache::{cache_execute_with_args, CacheArgs};
 use crate::cli::config::{config_execute_with_args, ConfigArgs};
 use crate::cli::daemon::{daemon_execute_with_args, DaemonArgs};
+use crate::cli::install::{install_execute_with_args, InstallArgs};
 use crate::cli::internal::{internal_execute_with_args, InternalArgs};
 use crate::log::init_env_logger;
 use log::trace;
@@ -25,6 +27,7 @@ pub enum SubCommands {
     Config(ConfigArgs),
     Daemon(DaemonArgs),
     Format(FormatArgs),
+    Install(InstallArgs),
     #[clap(hide = true)]
     Internal(InternalArgs),
 }
@@ -96,6 +99,7 @@ pub fn execute_with_args(args: Command) -> Result<()> {
         SubCommands::Config(s_args) => config_execute_with_args(s_args, global_options),
         SubCommands::Daemon(s_args) => daemon_execute_with_args(s_args, global_options),
         SubCommands::Format(s_args) => format_execute_with_args(s_args, global_options),
+        SubCommands::Install(s_args) => install_execute_with_args(s_args, global_options),
         SubCommands::Internal(s_args) => internal_execute_with_args(s_args, global_options),
     }?;
 
