@@ -9,7 +9,7 @@
     "author": "",
     "license": "ISC",
     "dependencies": {
-        "@biomejs/biome": "^2.0.6"
+        "@biomejs/biome": "^2.4.8"
     },
     "devDependencies": {
         "prettier": "^3.3.3"

@@ -5,103 +5,105 @@ Running benchmarks...
 Running benchmark for biome + small...
 
 Benchmark 1: npx biome format --write ./src/small.tsx
-  Time (mean ± σ):     287386.5 µs ± 15468.0 µs    [User: 253841.3 µs, System: 64454.1 µs]
-  Range (min … max):   261792.1 µs … 307394.4 µs    10 runs
+  Time (mean ± σ):     297153.2 µs ± 14859.2 µs    [User: 259097.8 µs, System: 66995.0 µs]
+  Range (min … max):   276480.7 µs … 327119.8 µs    10 runs
  
 Benchmark 2: ./node_modules/@biomejs/cli-linux-x64/biome format --write ./src/small.tsx
-  Time (mean ± σ):     49261.2 µs ± 9884.2 µs    [User: 2356.7 µs, System: 13678.8 µs]
-  Range (min … max):   31411.6 µs … 80437.5 µs    53 runs
+  Time (mean ± σ):     52326.7 µs ± 8657.0 µs    [User: 4185.0 µs, System: 13885.1 µs]
+  Range (min … max):   32250.5 µs … 71192.4 µs    50 runs
  
 Benchmark 3: foro format ./src/small.tsx
-  Time (mean ± σ):     3470.8 µs ± 466.8 µs    [User: 1089.2 µs, System: 775.3 µs]
-  Range (min … max):   2550.9 µs … 5440.1 µs    740 runs
+  Time (mean ± σ):     3256.3 µs ± 412.0 µs    [User: 1106.4 µs, System: 732.7 µs]
+  Range (min … max):   2592.2 µs … 5328.2 µs    708 runs
  
 Summary
   foro format ./src/small.tsx ran
-   14.19 ± 3.43 times faster than ./node_modules/@biomejs/cli-linux-x64/biome format --write ./src/small.tsx
-   82.80 ± 11.99 times faster than npx biome format --write ./src/small.tsx
+   16.07 ± 3.35 times faster than ./node_modules/@biomejs/cli-linux-x64/biome format --write ./src/small.tsx
+   91.26 ± 12.41 times faster than npx biome format --write ./src/small.tsx
 
 
 
 Running benchmark for biome + large...
 
 Benchmark 1: npx biome format --write ./src/large.tsx
-  Time (mean ± σ):     300571.8 µs ± 14150.3 µs    [User: 250378.3 µs, System: 72672.5 µs]
-  Range (min … max):   281738.3 µs … 321317.2 µs    10 runs
+  Time (mean ± σ):     301048.4 µs ± 11411.9 µs    [User: 259173.2 µs, System: 75838.4 µs]
+  Range (min … max):   287416.3 µs … 326767.4 µs    10 runs
  
 Benchmark 2: ./node_modules/@biomejs/cli-linux-x64/biome format --write ./src/large.tsx
-  Time (mean ± σ):     53601.1 µs ± 8748.8 µs    [User: 7533.5 µs, System: 13502.6 µs]
-  Range (min … max):   39684.7 µs … 74879.1 µs    48 runs
+  Time (mean ± σ):     55037.2 µs ± 10517.8 µs    [User: 10071.0 µs, System: 12724.6 µs]
+  Range (min … max):   32565.7 µs … 91450.7 µs    67 runs
  
 Benchmark 3: foro format ./src/large.tsx
-  Time (mean ± σ):     9935.2 µs ± 1755.0 µs    [User: 1203.1 µs, System: 861.6 µs]
-  Range (min … max):   6807.1 µs … 14317.4 µs    392 runs
+  Time (mean ± σ):     9350.2 µs ± 1500.8 µs    [User: 1178.1 µs, System: 892.6 µs]
+  Range (min … max):   6549.8 µs … 14506.7 µs    305 runs
  
 Summary
   foro format ./src/large.tsx ran
-    5.40 ± 1.30 times faster than ./node_modules/@biomejs/cli-linux-x64/biome format --write ./src/large.tsx
-   30.25 ± 5.53 times faster than npx biome format --write ./src/large.tsx
+    5.89 ± 1.47 times faster than ./node_modules/@biomejs/cli-linux-x64/biome format --write ./src/large.tsx
+   32.20 ± 5.31 times faster than npx biome format --write ./src/large.tsx
 
 
 
 Running benchmark for ruff format + small...
 
 Benchmark 1: ruff format ./src/ruff_test/small.py
-  Time (mean ± σ):     7162.4 µs ± 334.0 µs    [User: 2921.5 µs, System: 10107.7 µs]
-  Range (min … max):   6502.6 µs … 9310.7 µs    374 runs
+  Time (mean ± σ):     7344.4 µs ± 409.5 µs    [User: 2942.1 µs, System: 10144.4 µs]
+  Range (min … max):   6515.4 µs … 10323.1 µs    385 runs
  
 Benchmark 2: foro format ./src/ruff_test/small.py
-  Time (mean ± σ):     2493.5 µs ± 371.4 µs    [User: 1079.3 µs, System: 726.8 µs]
-  Range (min … max):   1858.7 µs … 4007.9 µs    1100 runs
+  Time (mean ± σ):     2384.7 µs ± 369.1 µs    [User: 1090.8 µs, System: 612.9 µs]
+  Range (min … max):   1887.5 µs … 7431.3 µs    1087 runs
+ 
+  Warning: Statistical outliers were detected. Consider re-running this benchmark on a quiet system without any interferences from other programs. It might help to use the '--warmup' or '--prepare' options.
  
 Summary
   foro format ./src/ruff_test/small.py ran
-    2.87 ± 0.45 times faster than ruff format ./src/ruff_test/small.py
+    3.08 ± 0.51 times faster than ruff format ./src/ruff_test/small.py
 
 
 
 Running benchmark for ruff format + large...
 
 Benchmark 1: ruff format ./src/ruff_test/large.py
-  Time (mean ± σ):     7139.6 µs ± 278.9 µs    [User: 3078.4 µs, System: 9908.8 µs]
-  Range (min … max):   6574.6 µs … 9297.4 µs    398 runs
+  Time (mean ± σ):     7249.6 µs ± 384.1 µs    [User: 3179.7 µs, System: 9758.6 µs]
+  Range (min … max):   6563.6 µs … 9018.9 µs    386 runs
  
 Benchmark 2: foro format ./src/ruff_test/large.py
-  Time (mean ± σ):     5152.5 µs ± 657.5 µs    [User: 1240.8 µs, System: 779.1 µs]
-  Range (min … max):   3885.8 µs … 6711.1 µs    596 runs
+  Time (mean ± σ):     5388.2 µs ± 870.3 µs    [User: 1296.0 µs, System: 852.4 µs]
+  Range (min … max):   3773.2 µs … 8531.3 µs    734 runs
  
 Summary
   foro format ./src/ruff_test/large.py ran
-    1.39 ± 0.18 times faster than ruff format ./src/ruff_test/large.py
+    1.35 ± 0.23 times faster than ruff format ./src/ruff_test/large.py
 
 
 
 Running benchmark for clang-format + small...
 
 Benchmark 1: clang-format ./small.cpp
-  Time (mean ± σ):     18364.3 µs ± 3961.8 µs    [User: 5417.7 µs, System: 12815.5 µs]
-  Range (min … max):   13841.5 µs … 31499.0 µs    183 runs
+  Time (mean ± σ):     23757.2 µs ± 4560.6 µs    [User: 7638.6 µs, System: 15933.5 µs]
+  Range (min … max):   14236.7 µs … 32096.4 µs    152 runs
  
 Benchmark 2: foro format ./small.cpp
-  Time (mean ± σ):     2856.2 µs ± 529.0 µs    [User: 1145.7 µs, System: 641.1 µs]
-  Range (min … max):   2134.0 µs … 4629.6 µs    813 runs
+  Time (mean ± σ):     2874.6 µs ± 427.2 µs    [User: 1116.6 µs, System: 763.5 µs]
+  Range (min … max):   2172.8 µs … 4296.1 µs    709 runs
  
 Summary
   foro format ./small.cpp ran
-    6.43 ± 1.83 times faster than clang-format ./small.cpp
+    8.26 ± 2.01 times faster than clang-format ./small.cpp
 
 
 
 Running benchmark for clang-format + large...
 
 Benchmark 1: clang-format ./large.cpp
-  Time (mean ± σ):     29420.0 µs ± 5782.8 µs    [User: 12696.0 µs, System: 16555.4 µs]
-  Range (min … max):   19594.2 µs … 42048.3 µs    140 runs
+  Time (mean ± σ):     37860.3 µs ± 4303.7 µs    [User: 17444.7 µs, System: 20234.8 µs]
+  Range (min … max):   22333.2 µs … 44094.3 µs    126 runs
  
 Benchmark 2: foro format ./large.cpp
-  Time (mean ± σ):     16668.2 µs ± 3304.0 µs    [User: 1354.5 µs, System: 913.3 µs]
-  Range (min … max):   10325.8 µs … 22543.5 µs    190 runs
+  Time (mean ± σ):     14556.3 µs ± 2920.4 µs    [User: 1275.8 µs, System: 974.0 µs]
+  Range (min … max):   10005.5 µs … 22989.3 µs    185 runs
  
 Summary
   foro format ./large.cpp ran
-    1.77 ± 0.49 times faster than clang-format ./large.cpp
+    2.60 ± 0.60 times faster than clang-format ./large.cpp
