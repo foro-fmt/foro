@@ -392,10 +392,39 @@ cp tests/fixtures/<plugin>/input.<ext> tests/fixtures/<plugin>/output.<ext>
 
 Review the diff carefully before committing — a formatter behavior change should be intentional.
 
-### 8c. Commit and Push
+### 8c. Update Benchmarks
+
+Update the benchmark comparison tools to match the newly released plugin versions, then re-run.
+
+**biome** — update the npm package in `benchmark/biome-test/`:
 
 ```bash
-git add src/config/default_config.json tests/fixtures/
+cd benchmark/biome-test
+npm install @biomejs/biome@<NEW_BIOME_VERSION>
+```
+
+**ruff** — upgrade the system tool:
+
+```bash
+uv tool upgrade ruff
+# Verify: ruff --version
+```
+
+**clang-format** — the benchmark uses the Ubuntu system package (`apt install clang-format`). Updating to a specific LLVM version requires manual steps; do so when the Ubuntu package lags significantly behind the plugin version.
+
+Re-run and capture results:
+
+```bash
+cd benchmark
+uv run ./run.py 2>&1 | tee ./run_result.txt
+```
+
+Review the output and confirm foro is still faster than the baseline tools.
+
+### 8d. Commit and Push
+
+```bash
+git add src/config/default_config.json tests/fixtures/ benchmark/
 git commit -m "chore(plugins): bump plugin versions to <summary>"
 git push
 ```
