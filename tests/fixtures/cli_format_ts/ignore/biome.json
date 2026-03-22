@@ -1,5 +1,5 @@
 {
 	"files": {
-		"ignore": ["main.ts"]
+		"includes": ["**", "!main.ts"]
 	}
 }
