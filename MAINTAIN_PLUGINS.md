@@ -319,6 +319,7 @@ done
 - Update `LLVM_VERSION` and `URL_HASH SHA256=...` in `CMakeLists.txt`.
 - Get the correct SHA256 by downloading the tarball: `curl -sL <url> | sha256sum`.
 - `BUILD_OUT_DIR` is `./build` (not Rust `target/`).
+- **GLIBC compatibility**: The Linux build must use `container: 'buildpack-deps:focal'` (Ubuntu 20.04) on the `ubuntu-24.04` runner, same as foro-rustfmt. Without this, the `.so` will be linked against GLIBC 2.38+ (Ubuntu 24.04's default) and will fail to load on older systems. The container runs as root, so `apt-get` is used without `sudo`.
 
 ### foro-tombi
 - Tracks the `foro-tombi` branch of `nahco314/tombi` (not the main branch).
