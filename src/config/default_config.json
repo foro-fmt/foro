@@ -20,7 +20,7 @@
 		},
 		{
 			"on": [".c", ".cpp", ".h", ".hpp"],
-			"cmd": "https://github.com/foro-fmt/foro-clang-format/releases/download/22.1.1/foro-clang-format.dllpack"
+			"cmd": "https://github.com/foro-fmt/foro-clang-format/releases/download/22.1.1-1/foro-clang-format.dllpack"
 		}
 	]
 }
