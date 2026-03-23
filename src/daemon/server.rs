@@ -2,7 +2,6 @@ use crate::app_dir::{AppDirResolver, DefaultAppDirResolver};
 use crate::bulk_format::{bulk_format, BulkFormatOption};
 use crate::cli::GlobalOptions;
 use crate::config::{load_config_and_cache, read_config_bytes};
-use crate::install_check::check_ready;
 use crate::config::{Rule, SomeCommand};
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
@@ -14,6 +13,7 @@ use crate::daemon::startup_lock::StartupLock;
 use crate::daemon::uds::{UnixListener, UnixStream};
 use crate::debug_long;
 use crate::handle_plugin::run::{run, run_pure};
+use crate::install_check::check_ready;
 use crate::log::IS_DAEMON_PROCESS;
 use crate::log::{DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD};
 use crate::path_utils::{normalize_path, to_wasm_path};
