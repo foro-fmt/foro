@@ -11,7 +11,7 @@ clap = { version = "4.5.8", features = ["derive", "string"] }
 clap-verbosity-flag = "2.2.1"
 dialoguer = "0.11.0"
 dirs = "5.0.1"
-dll-pack = { version = "0.3.0", git = "https://github.com/foro-fmt/dll-pack", rev = "7f04c196288aeb4da1b66ee8d265da2516d16a49" }
+dll-pack = { version = "0.3.0", git = "https://github.com/foro-fmt/dll-pack", rev = "3788858db649b65cfbc52a7f786c0a600fae0067" }
 env_logger = "0.11.3"
 foro-plugin-utils = { version = "0.2.0", git = "https://github.com/foro-fmt/foro-plugin-utils" }
 ignore = "0.4.23"

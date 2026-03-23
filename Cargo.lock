@@ -653,7 +653,7 @@ dependencies = [
 [[package]]
 name = "dll-pack"
 version = "0.3.0"
-source = "git+https://github.com/foro-fmt/dll-pack?rev=7f04c196288aeb4da1b66ee8d265da2516d16a49#7f04c196288aeb4da1b66ee8d265da2516d16a49"
+source = "git+https://github.com/foro-fmt/dll-pack?rev=3788858db649b65cfbc52a7f786c0a600fae0067#3788858db649b65cfbc52a7f786c0a600fae0067"
 dependencies = [
  "anyhow",
  "libloading",

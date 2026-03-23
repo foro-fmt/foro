@@ -4,7 +4,8 @@ use crate::install_check::mark_ready;
 use anyhow::Result;
 use clap::Parser;
 use dll_pack::resolve::ResolveError;
-use dll_pack::{prefetch, THIS_PLATFORM};
+use dll_pack::resolve::download;
+use dll_pack::THIS_PLATFORM;
 use std::collections::HashSet;
 use url::Url;
 
@@ -21,19 +22,19 @@ pub fn install_execute_with_args(_args: InstallArgs, global_options: GlobalOptio
     let urls: HashSet<Url> = config.all_plugin_urls().into_iter().collect();
 
     for url in &urls {
-        prefetch_with_wasm_fallback(url, &cache_dir)?;
+        download_with_wasm_fallback(url, &cache_dir)?;
     }
 
     mark_ready(&config_bytes, &cache_dir)?;
     Ok(())
 }
 
-fn prefetch_with_wasm_fallback(url: &Url, cache_dir: &std::path::PathBuf) -> Result<()> {
-    match prefetch(url, cache_dir, THIS_PLATFORM) {
+fn download_with_wasm_fallback(url: &Url, cache_dir: &std::path::PathBuf) -> Result<()> {
+    match download(url, cache_dir, THIS_PLATFORM) {
         Ok(_) => Ok(()),
         Err(e) => {
             if e.downcast_ref::<ResolveError>().is_some() {
-                prefetch(url, cache_dir, "wasm32-wasip1")
+                download(url, cache_dir, "wasm32-wasip1")
             } else {
                 Err(e)
             }
