@@ -64,8 +64,9 @@ The task is complete only when:
 - All `build-local-artifacts` jobs succeed on every platform.
 - `build-global-artifacts` succeeds.
 - `host` succeeds (Release workflow only).
-- A GitHub Release exists for the new tag with the expected assets.
-- The GitHub Release body has been updated with end-user release notes (see each plugin's UPDATE_GUIDE.md Step 8).
+- A GitHub Release exists for the new tag with the expected assets and proper release notes.
+
+**Release notes must be written before pushing the tag.** Each plugin repo contains a `RELEASE_NOTES.md` file that CI reads when creating the GitHub Release. CI fails if the file still contains the placeholder text. The sub-agent must write proper release notes into `RELEASE_NOTES.md` and commit it before pushing the version tag. See each plugin's UPDATE_GUIDE.md for content guidelines.
 
 ## Tools Required
 
