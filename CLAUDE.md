@@ -7,31 +7,12 @@ About plugin management, read ./MAINTAIN_PLUGINS.md .
 
 About releasing foro, read ./RELEASE.md .
 
-## Client vs Daemon responsibilities
+## Architectural principles
 
-foro has two access paths: the CLI (`foro format`) and direct daemon communication (used by IDE plugins, editor integrations, etc.). Any logic placed only in the CLI layer is invisible to non-CLI callers.
+**Client vs daemon responsibilities**: foro is accessed via the CLI and also directly via daemon communication (e.g. IDE plugins). Any logic placed only in the CLI layer is invisible to non-CLI callers. Substantial processing — plugin loading, validation, formatting — must live in the daemon. The client is responsible only for argument parsing, launching/connecting to the daemon, and forwarding results. When deciding where logic belongs, always ask: "does this need to work when called outside the CLI?"
 
-**Rule: all substantial processing must live in the daemon, not the client.**
+**Single responsibility per operation**: Operations that are conceptually distinct (e.g. downloading vs. loading vs. resolving dependencies) must be separate code paths. Coupling them causes unintended side effects — for example, a "load" that silently downloads on cache miss will trigger network I/O from contexts where that is never expected. Each operation should do exactly one thing and fail loudly if its preconditions aren't met.
 
-The client (CLI) is responsible only for:
-- Parsing arguments and user-facing flags
-- Launching/connecting to the daemon
-- Forwarding requests and printing results
+## Notes on this file
 
-The daemon is responsible for:
-- Loading plugins
-- Checking whether plugins are installed
-- Running formatters
-
-**Plugin installation checks must be in the daemon.** Putting `check_ready` in `format.rs` (the CLI handler) means IDE plugins that talk directly to the daemon bypass the check entirely, causing freezes or silent failures when plugins are not downloaded.
-
-## dll-pack download/load separation
-
-dll-pack's current `resolve()` does download + path resolution in one shot via `cached_download_lib` / `cached_download_manifest`. This means any caller of `resolve()` can silently trigger a network download. This is the root cause of the "waits a while then auto-downloads" behavior.
-
-The correct design requires two distinct operations in dll-pack:
-
-- **`install(url, work_dir, platform)`** — downloads all manifests and libraries for a plugin. Called only from `foro install`. This is the only legitimate download path.
-- **`load(url, work_dir, platform)`** — assumes all files are already on disk. If any file is missing, it must return a hard error (or panic) immediately. Never downloads. Called by the daemon when it needs to use a plugin.
-
-Until dll-pack is redesigned this way, any call to `resolve()` from the daemon or format logic is a latent bug. When fixing this, change dll-pack first, then update foro's daemon to use `load()` instead of `resolve()`.
+CLAUDE.md is for general architectural principles and project-wide conventions that are not derivable from reading the code. Do not record individual bugs, specific code locations, or current implementation details here — those belong in code comments, commit messages, or issue trackers, and writing them here wastes context window. Concrete examples to illustrate a principle are fine, but keep them brief.
