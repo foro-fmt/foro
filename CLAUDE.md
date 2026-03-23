@@ -25,4 +25,13 @@ The daemon is responsible for:
 
 **Plugin installation checks must be in the daemon.** Putting `check_ready` in `format.rs` (the CLI handler) means IDE plugins that talk directly to the daemon bypass the check entirely, causing freezes or silent failures when plugins are not downloaded.
 
-**`foro install` is the only legitimate download path.** dll-pack's `resolve()` silently downloads plugins on demand as a side effect. Any code path that reaches `resolve()` outside of `foro install` is a bug — the daemon must panic or return a hard error if it encounters a plugin that is not already present on disk. Never silently trigger a download from the daemon or from format logic.
+## dll-pack download/load separation
+
+dll-pack's current `resolve()` does download + path resolution in one shot via `cached_download_lib` / `cached_download_manifest`. This means any caller of `resolve()` can silently trigger a network download. This is the root cause of the "waits a while then auto-downloads" behavior.
+
+The correct design requires two distinct operations in dll-pack:
+
+- **`install(url, work_dir, platform)`** — downloads all manifests and libraries for a plugin. Called only from `foro install`. This is the only legitimate download path.
+- **`load(url, work_dir, platform)`** — assumes all files are already on disk. If any file is missing, it must return a hard error (or panic) immediately. Never downloads. Called by the daemon when it needs to use a plugin.
+
+Until dll-pack is redesigned this way, any call to `resolve()` from the daemon or format logic is a latent bug. When fixing this, change dll-pack first, then update foro's daemon to use `load()` instead of `resolve()`.
