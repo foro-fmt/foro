@@ -1,7 +1,8 @@
 use crate::app_dir::{AppDirResolver, DefaultAppDirResolver};
 use crate::bulk_format::{bulk_format, BulkFormatOption};
 use crate::cli::GlobalOptions;
-use crate::config::load_config_and_cache;
+use crate::config::{load_config_and_cache, read_config_bytes};
+use crate::install_check::check_ready;
 use crate::config::{Rule, SomeCommand};
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
@@ -64,10 +65,13 @@ pub fn daemon_format_execute_with_args(
             let _ = start.set(parent_start_time);
         });
 
+        let config_bytes = read_config_bytes(global_options.config_file.as_deref())?;
         let (config, cache_dir) = load_config_and_cache(
             global_options.config_file.as_deref(),
             global_options.cache_dir.as_deref(),
         )?;
+        check_ready(&config_bytes, &cache_dir)
+            .context("Plugins not installed: run `foro install` first")?;
 
         // todo: why not fs::read ?
         let file = fs::File::open(&t_target_path)?;
@@ -187,10 +191,13 @@ pub fn daemon_pure_format_execute_with_args(
 ) -> Result<DaemonPureFormatResponse> {
     let target_path = current_dir.join(&args.path).canonicalize()?;
 
+    let config_bytes = read_config_bytes(global_options.config_file.as_deref())?;
     let (config, cache_dir) = load_config_and_cache(
         global_options.config_file.as_deref(),
         global_options.cache_dir.as_deref(),
     )?;
+    check_ready(&config_bytes, &cache_dir)
+        .context("Plugins not installed: run `foro install` first")?;
 
     let rule = match config.find_matched_rule(&target_path, true) {
         Some(rule) => rule,
@@ -274,10 +281,13 @@ pub fn daemon_bulk_format_execute_with_args(
         })
         .collect::<Result<Vec<PathBuf>>>()?;
 
+    let config_bytes = read_config_bytes(global_options.config_file.as_deref())?;
     let (config, cache_dir) = load_config_and_cache(
         global_options.config_file.as_deref(),
         global_options.cache_dir.as_deref(),
     )?;
+    check_ready(&config_bytes, &cache_dir)
+        .context("Plugins not installed: run `foro install` first")?;
 
     let opt = BulkFormatOption {
         paths,
