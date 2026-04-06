@@ -6,7 +6,7 @@ use crate::daemon::server::start_daemon;
 use crate::daemon::startup_lock::StartupLock;
 use anyhow::Result;
 use clap::Parser;
-use log::warn;
+use log::info;
 
 #[derive(Parser, Debug)]
 pub struct DaemonStartArgs {
@@ -35,7 +35,7 @@ pub fn daemon_start_execute_with_args(
     let lock = StartupLock::acquire(&socket_dir)?;
 
     if matches!(daemon_is_alive(&socket)?, DaemonStatus::Running(_)) {
-        warn!("Daemon is already running");
+        info!("Daemon is already running");
         return Ok(());
     }
 

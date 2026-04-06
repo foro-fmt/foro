@@ -34,9 +34,7 @@ fn format_file(
     // Return type changed to bool: true indicates the file was changed
     info!("Formatting: {:?}", path);
 
-    let rule = config
-        .find_matched_rule(path)
-        .context("No rule matched")?;
+    let rule = config.find_matched_rule(path).context("No rule matched")?;
 
     debug_long!("run rule: {:?}", rule);
 
