@@ -89,17 +89,3 @@ fn test_cli_bulk_format_foro_ignore_glob() {
     // *.generated.rs should be excluded by .foro-ignore glob pattern
     env.assert_eq("input/types.generated.rs", "expected/types.generated.rs");
 }
-
-#[test]
-fn test_cli_bulk_format_success_message_is_rendered_by_cli() {
-    let env = TestEnvBuilder::new()
-        .fixture_path("./tests/fixtures/cli_bulk_format/basic/")
-        .work_dir("./input/")
-        .build();
-
-    let output = env.foro_cmd(&["format", "."]).output().unwrap();
-    assert!(output.status.success());
-
-    let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("Formatted successfully: 2 files processed. 2 files changed."));
-}

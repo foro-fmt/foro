@@ -268,6 +268,7 @@ mod tests {
         let summary = BulkFormatSummary {
             total_count: 3,
             changed_count: 0,
+            unchanged_count: 3,
         };
 
         assert_eq!(
@@ -281,11 +282,26 @@ mod tests {
         let summary = BulkFormatSummary {
             total_count: 3,
             changed_count: 2,
+            unchanged_count: 1,
         };
 
         assert_eq!(
             format_bulk_success_message(summary),
             "3 files processed. 2 files changed."
+        );
+    }
+
+    #[test]
+    fn format_bulk_success_message_reports_single_file_changed() {
+        let summary = BulkFormatSummary {
+            total_count: 5,
+            changed_count: 1,
+            unchanged_count: 4,
+        };
+
+        assert_eq!(
+            format_bulk_success_message(summary),
+            "5 files processed. 1 file changed."
         );
     }
 }
