@@ -1,6 +1,6 @@
 mod common;
 
-use crate::common::TestEnvBuilder;
+use crate::common::{uv_available, TestEnvBuilder};
 use assert_cmd::prelude::*;
 
 #[test]
@@ -66,7 +66,13 @@ fn test_cli_bulk_format_multiple_paths() {
 }
 
 #[test]
+#[cfg_attr(target_os = "windows", ignore = "CommandIO is unsupported on Windows")]
 fn test_cli_bulk_format_no_rule_match() {
+    if !uv_available() {
+        eprintln!("skipping test_cli_bulk_format_no_rule_match: uv is not available");
+        return;
+    }
+
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/no_rule_match/")
         .work_dir("./input/")
@@ -100,6 +106,7 @@ fn test_cli_bulk_format_foro_ignore_glob() {
 }
 
 #[test]
+#[cfg_attr(target_os = "windows", ignore = "CommandIO is unsupported on Windows")]
 fn test_cli_bulk_format_error_count() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/error_count/")

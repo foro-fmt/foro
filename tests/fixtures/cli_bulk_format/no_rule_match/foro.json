@@ -3,7 +3,7 @@
 		{
 			"on": ".rs",
 			"cmd": {
-				"io": "rustfmt"
+				"io": "uv run python -c 'import sys; s = sys.stdin.read(); sys.stdout.write(s.replace(\"(      )\", \"()\").replace(\"(  \", \"(\").replace(\"   )\", \")\"))'"
 			}
 		}
 	]
