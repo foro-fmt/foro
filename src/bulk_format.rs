@@ -6,13 +6,13 @@ use crate::path_utils::{normalize_path, to_wasm_path};
 use anyhow::{Context, Result};
 use foro_plugin_utils::data_json_utils::JsonGetter;
 use ignore::overrides::OverrideBuilder;
-use ignore::{WalkBuilder, WalkState};
+use ignore::WalkBuilder;
 use log::{error, info, trace};
 use serde_json::json;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc};
 use std::time::Instant;
 use std::{fs, io, thread};
 
@@ -90,7 +90,6 @@ pub fn bulk_format(
         walk_builder.add(path);
     }
 
-    walk_builder.threads(opt.threads);
     walk_builder.add_custom_ignore_filename(".foro-ignore");
 
     if opt.use_default_ignore {
@@ -109,83 +108,88 @@ pub fn bulk_format(
         walk_builder.overrides(overrides);
     }
 
-    let walk = walk_builder.build_parallel();
-
     let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(Instant::now));
+    let worker_count = opt.threads.max(1);
 
-    let formatting_threads = Arc::new(Mutex::new(Vec::new()));
     let changed_count = Arc::new(AtomicUsize::new(0)); // Count of files that were changed
     let unchanged_count = Arc::new(AtomicUsize::new(0)); // Count of files that were not changed
-    let running_count = Arc::new(AtomicUsize::new(0));
 
-    walk.run(|| {
-        Box::new(|entry_res| {
-            match entry_res {
-                Ok(dir_entry) => {
-                    let opt = opt.clone();
-                    let config = config.clone();
-                    let cache_path = cache_path.to_path_buf();
-                    let changed_count = changed_count.clone();
-                    let unchanged_count = unchanged_count.clone();
-                    let running_count = running_count.clone();
+    let mut worker_senders = Vec::with_capacity(worker_count);
+    let mut worker_threads = Vec::with_capacity(worker_count);
+    for _ in 0..worker_count {
+        let (tx, rx) = mpsc::sync_channel::<Option<PathBuf>>(1);
+        worker_senders.push(tx);
 
-                    let path = dir_entry.path().to_path_buf();
+        let config = config.clone();
+        let cache_path = cache_path.to_path_buf();
+        let changed_count = changed_count.clone();
+        let unchanged_count = unchanged_count.clone();
 
-                    if path.is_dir() {
-                        return WalkState::Continue;
+        let worker = thread::spawn(move || {
+            DAEMON_THREAD_START.with(|start| {
+                let _ = start.set(parent_start_time);
+            });
+
+            while let Ok(job) = rx.recv() {
+                let Some(path) = job else {
+                    break;
+                };
+
+                let res = format_file(
+                    &path,
+                    path.parent().unwrap(),
+                    &config,
+                    &cache_path,
+                    use_cache,
+                );
+
+                match res {
+                    Ok(was_changed) => {
+                        if was_changed {
+                            changed_count.fetch_add(1, Ordering::SeqCst);
+                        } else {
+                            unchanged_count.fetch_add(1, Ordering::SeqCst);
+                        }
                     }
-
-                    let t = thread::spawn(move || {
-                        DAEMON_THREAD_START.with(|start| {
-                            let _ = start.set(parent_start_time);
-                        });
-
-                        while running_count.load(Ordering::SeqCst) >= opt.threads {
-                            thread::sleep(std::time::Duration::from_micros(100));
-                        }
-
-                        running_count.fetch_add(1, Ordering::SeqCst);
-
-                        let res = format_file(
-                            &path,
-                            path.parent().unwrap(),
-                            &config,
-                            &cache_path,
-                            use_cache,
-                        );
-
-                        running_count.fetch_sub(1, Ordering::SeqCst);
-
-                        match res {
-                            Ok(was_changed) => {
-                                if was_changed {
-                                    changed_count.fetch_add(1, Ordering::SeqCst);
-                                } else {
-                                    unchanged_count.fetch_add(1, Ordering::SeqCst);
-                                }
-                            }
-                            Err(err) => {
-                                error!("Error formatting file: {}", err);
-                            }
-                        }
-                    });
-
-                    formatting_threads.lock().unwrap().push(t);
-                }
-                Err(err) => {
-                    error!("Error reading entry: {}", err);
+                    Err(err) => {
+                        error!("Error formatting file: {}", err);
+                    }
                 }
             }
+        });
 
-            WalkState::Continue
-        })
-    });
+        worker_threads.push(worker);
+    }
 
-    for t in Arc::try_unwrap(formatting_threads)
-        .unwrap()
-        .into_inner()
-        .unwrap()
-    {
+    let walk = walk_builder.build();
+    let mut next_worker = 0usize;
+    for entry_res in walk {
+        match entry_res {
+            Ok(dir_entry) => {
+                let path = dir_entry.path().to_path_buf();
+
+                if path.is_dir() {
+                    continue;
+                }
+
+                let target_worker = next_worker % worker_count;
+                next_worker += 1;
+
+                if worker_senders[target_worker].send(Some(path)).is_err() {
+                    error!("Worker thread exited before receiving all tasks");
+                }
+            }
+            Err(err) => {
+                error!("Error reading entry: {}", err);
+            }
+        }
+    }
+
+    for tx in worker_senders {
+        let _ = tx.send(None);
+    }
+
+    for t in worker_threads {
         t.join().unwrap();
     }
 
