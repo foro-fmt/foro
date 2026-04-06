@@ -2,7 +2,7 @@ use crate::build_info::get_build_id;
 use crate::cli::GlobalOptions;
 use crate::daemon::interface::{
     DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands, DaemonFormatResponse,
-    DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath,
+    DaemonResponse, DaemonSocketPath,
 };
 use crate::daemon::server::start_daemon;
 use crate::daemon::startup_lock::StartupLock;
@@ -160,10 +160,10 @@ pub fn ensure_daemon_running(
 
             if daemon_build_id != &current_build_id {
                 if global_options.ignore_build_id_mismatch {
-                    warn!("Daemon was built with a different build ID (daemon: {}, client: {}). Continuing without restart due to --ignore-build-id-mismatch flag.", 
+                    warn!("Daemon was built with a different build ID (daemon: {}, client: {}). Continuing without restart due to --ignore-build-id-mismatch flag.",
                         daemon_build_id, current_build_id);
                 } else {
-                    info!("Daemon was built with a different build ID (daemon: {}, client: {}). Restarting daemon.", 
+                    info!("Daemon was built with a different build ID (daemon: {}, client: {}). Restarting daemon.",
                         daemon_build_id, current_build_id);
 
                     let stop_stream = UnixStream::connect(&socket.socket_path)?;
@@ -223,16 +223,6 @@ pub fn run_command(
             info!("File ignored. reason: {}", reason);
         }
         DaemonResponse::Format(DaemonFormatResponse::Error(err)) => {
-            return Err(anyhow!(err));
-        }
-        DaemonResponse::PureFormat(DaemonPureFormatResponse::Success(formatted)) => {
-            info!("Success to format");
-            println!("{formatted}");
-        }
-        DaemonResponse::PureFormat(DaemonPureFormatResponse::Ignored(reason)) => {
-            info!("File ignored. reason: {}", reason);
-        }
-        DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
         }
         DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Success(message)) => {

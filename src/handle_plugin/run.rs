@@ -1,6 +1,6 @@
-use crate::config::{CommandWithControlFlow, PureCommand, SomeCommand, WriteCommand};
+use crate::config::{Command, CommandWithControlFlow};
 use crate::handle_plugin::cache::run_multi_cached;
-use crate::{debug_long, trace_long};
+use crate::debug_long;
 use anyhow::{anyhow, Context, Result};
 use dll_pack::load::{load, Library, NativeLibrary, WasmLibrary};
 use foro_plugin_utils::data_json_utils::{merge, JsonGetter};
@@ -56,8 +56,8 @@ fn run_plugin_inner_wasm(
     //
     // However, due to the restrictions of the wasm abi,`foro_main` only returns a single integer value.
     //
-    // Therefore, it creates the output in the format “the length of the output json is placed
-    // in the first 8 bytes (in little endian) and the output json is placed after that”,
+    // Therefore, it creates the output in the format "the length of the output json is placed
+    // in the first 8 bytes (in little endian) and the output json is placed after that",
     // and returns the pointer to it.
 
     let result_ptr = func.call(&mut store, (data_ptr, input_len))?;
@@ -82,15 +82,6 @@ fn run_plugin_inner_wasm(
     if let Some(err_s) = String::get_value_opt(&output_value, ["plugin-panic"]) {
         return Err(anyhow!("Plugin panicked: {}", err_s));
     }
-
-    // if let Some(formatted) = String::get_value_opt(&output_value, ["formatted-content"]) {
-    //     let target = String::get_value(&cur_map, ["target"])?;
-    //     fs::write(target, formatted)?;
-    //
-    //     trace!("wrote");
-    // }
-
-    // drop of store is so slow, another thread dropping is maybe faster
 
     Ok(output_value)
 }
@@ -123,13 +114,6 @@ fn run_plugin_inner_native(library: &mut Library, cur_map: Value) -> Result<Valu
         return Err(anyhow!("Plugin panicked: {}", err_s));
     }
 
-    // if let Some(formatted) = String::get_value_opt(&output_value, ["formatted-content"]) {
-    //     let target = String::get_value(&cur_map, ["target"])?;
-    //     fs::write(target, formatted)?;
-    //
-    //     trace!("wrote");
-    // }
-
     Ok(output_value)
 }
 
@@ -161,14 +145,14 @@ fn run_plugin(
     run_plugin_inner(&mut lib, cur_json)
 }
 
-fn run_inner_pure_command(
-    command: &PureCommand,
+fn run_inner_command(
+    command: &Command,
     mut cur_json: Value,
     cache_path: &Path,
     use_cache: bool,
 ) -> Result<Value> {
     match command {
-        PureCommand::PluginUrl(url) => {
+        Command::PluginUrl(url) => {
             let setting = PluginSetting {
                 source: url.clone(),
                 cache: true,
@@ -180,7 +164,7 @@ fn run_inner_pure_command(
 
             Ok(cur_json)
         }
-        PureCommand::CommandIO { io: cmd } => {
+        Command::CommandIO { io: cmd } => {
             let env = minijinja::Environment::new();
             let rendered_cmd = env.render_str(cmd, &cur_json)?;
 
@@ -251,73 +235,8 @@ fn run_inner_pure_command(
     }
 }
 
-fn run_inner_write_command(
-    command: &WriteCommand,
-    cur_json: Value,
-    cache_path: &Path,
-    use_cache: bool,
-) -> Result<Value> {
-    match command {
-        WriteCommand::SimpleCommand(cmd) => {
-            let env = minijinja::Environment::new();
-            let rendered_cmd = env.render_str(cmd, &cur_json)?;
-
-            #[cfg(unix)]
-            let words = shell_words::split(&rendered_cmd)?;
-            #[cfg(windows)]
-            let words = winsplit::split(&rendered_cmd);
-
-            let (exec, args) = words.split_first().context("Empty command")?;
-            let current_dir = String::get_value(&cur_json, ["os-current-dir"])?;
-
-            debug_long!(
-                "exec: {:?}, args: {:?}, current_dir: {:?}",
-                exec,
-                args,
-                current_dir
-            );
-
-            let mut output = std::process::Command::new(exec)
-                .args(args)
-                .current_dir(current_dir)
-                .spawn()
-                .context("Failed to execute command")?;
-
-            trace!("spawned");
-
-            output.wait()?;
-
-            trace_long!("output: {:?}", output);
-
-            Ok(json!({}))
-        }
-        WriteCommand::Pure(pure) => {
-            let target_path = String::get_value(&cur_json, ["os-target"])?;
-
-            let res = run_inner_pure_command(pure, cur_json, cache_path, use_cache)?;
-
-            if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
-                fs::write(target_path, formatted)?;
-            }
-
-            Ok(res)
-        }
-    }
-}
-
-/// Execute the pure command or write command CommandWithControlFlow.
-///
-/// There are two types of commands in foro:
-/// - pure commands, which return the code received as a string without actually writing it to a file.
-/// - write commands, which write directly to a file at runtime.
-///
-/// Although write commands can contain pure commands, the reverse is not possible,
-/// and since the two share most of the control flow, etc.,
-/// the implementation is a little abstract and difficult to understand,
-/// via [run_flow], [CommandWithControlFlow] etc.
-fn run_flow<T>(
-    command_with_control_flow: &CommandWithControlFlow<T>,
-    run_inner: fn(&T, Value, &Path, bool) -> Result<Value>,
+fn run_flow(
+    command_with_control_flow: &CommandWithControlFlow<Command>,
     mut cur_json: Value,
     cache_path: &Path,
     use_cache: bool,
@@ -331,7 +250,7 @@ fn run_flow<T>(
         } => {
             trace!("if");
 
-            let run_res = run_flow(run, run_inner, cur_json, cache_path, use_cache)?;
+            let run_res = run_flow(run, cur_json, cache_path, use_cache)?;
 
             let env = minijinja::Environment::new();
             let cond_expr = env.compile_expression(cond)?;
@@ -342,9 +261,9 @@ fn run_flow<T>(
             trace!("cond_bool: {:?}", cond_bool);
 
             let res = if cond_bool {
-                run_flow(on_true, run_inner, run_res, cache_path, use_cache)
+                run_flow(on_true, run_res, cache_path, use_cache)
             } else {
-                run_flow(on_false, run_inner, run_res, cache_path, use_cache)
+                run_flow(on_false, run_res, cache_path, use_cache)
             }?;
 
             trace!("if done");
@@ -355,7 +274,7 @@ fn run_flow<T>(
             trace!("seq");
 
             for command in seq {
-                cur_json = run_flow(command, run_inner, cur_json, cache_path, use_cache)?;
+                cur_json = run_flow(command, cur_json, cache_path, use_cache)?;
             }
 
             trace!("seq done");
@@ -383,7 +302,7 @@ fn run_flow<T>(
         CommandWithControlFlow::Command(cmd) => {
             trace!("cmd");
 
-            let res = run_inner(cmd, cur_json, cache_path, use_cache)?;
+            let res = run_inner_command(cmd, cur_json, cache_path, use_cache)?;
 
             trace!("cmd done");
 
@@ -393,62 +312,28 @@ fn run_flow<T>(
 }
 
 pub fn run(
-    some_command: &SomeCommand,
+    command: &CommandWithControlFlow<Command>,
     cur_json: Value,
     cache_path: &Path,
     use_cache: bool,
 ) -> Result<Value> {
-    debug!("run command: {:?}", some_command);
+    debug!("run command: {:?}", command);
     debug_long!("data-json: {:?}", &cur_json);
 
-    let res = match some_command {
-        SomeCommand::Pure { cmd } => {
-            let target_path = String::get_value(&cur_json, ["os-target"])?;
-            let original_content = String::get_value(&cur_json, ["target-content"])?;
+    let target_path = String::get_value(&cur_json, ["os-target"])?;
+    let original_content = String::get_value(&cur_json, ["target-content"])?;
 
-            let res = run_flow(cmd, run_inner_pure_command, cur_json, cache_path, use_cache)?;
+    let res = run_flow(command, cur_json, cache_path, use_cache)?;
 
-            if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
-                if formatted != original_content {
-                    fs::write(target_path, formatted)?;
-                }
-            }
-            res
+    if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
+        if formatted != original_content {
+            fs::write(target_path, formatted)?;
         }
-        SomeCommand::Write { write_cmd } => run_flow(
-            write_cmd,
-            run_inner_write_command,
-            cur_json,
-            cache_path,
-            use_cache,
-        )?,
-    };
+    }
 
-    debug!("done command: {:?}", some_command);
+    debug!("done command");
     debug_long!("data-json: {:?}", &res);
 
     Ok(res)
 }
 
-pub fn run_pure(
-    command: &CommandWithControlFlow<PureCommand>,
-    cur_json: Value,
-    cache_path: &Path,
-    use_cache: bool,
-) -> Result<Value> {
-    debug!("run pure command: {:?}", command);
-    debug_long!("data-json: {:?}", &cur_json);
-
-    let res = run_flow(
-        command,
-        run_inner_pure_command,
-        cur_json,
-        cache_path,
-        use_cache,
-    )?;
-
-    debug!("done pure command: {:?}", command);
-    debug_long!("data-json: {:?}", &res);
-
-    Ok(res)
-}

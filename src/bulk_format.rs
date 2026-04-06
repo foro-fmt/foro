@@ -34,11 +34,8 @@ fn format_file(
     // Return type changed to bool: true indicates the file was changed
     info!("Formatting: {:?}", path);
 
-    // Note: Although it is possible that bulk-format can also execute non-pure rules,
-    //       we will not handle them because the was_changed judgement does not work properly.
-    //       In addition, by targeting only pure rules, we will make it easier to perform future optimisations.
     let rule = config
-        .find_matched_rule(path, true)
+        .find_matched_rule(path)
         .context("No rule matched")?;
 
     debug_long!("run rule: {:?}", rule);
@@ -51,7 +48,7 @@ fn format_file(
     trace!("opened file: {:?}", path);
 
     let res = run(
-        &rule.some_cmd,
+        &rule.cmd,
         json!({
             "wasm-current-dir":  to_wasm_path(current_dir)?,
             "os-current-dir": normalize_path(current_dir)?,

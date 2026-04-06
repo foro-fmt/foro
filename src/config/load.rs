@@ -311,7 +311,6 @@ mod tests {
 
         assert_eq!(loaded_cache_dir, custom_cache_dir);
         assert_eq!(loaded_config.rules.len(), 1);
-        assert!(loaded_config.rules[0].some_cmd.is_pure());
 
         Ok(())
     }

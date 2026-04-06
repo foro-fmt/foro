@@ -26,16 +26,9 @@ impl OnRule {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub enum PureCommand {
+pub enum Command {
     PluginUrl(#[serde(with = "url_serde")] Url),
     CommandIO { io: String },
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum WriteCommand {
-    Pure(PureCommand),
-    SimpleCommand(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -54,36 +47,14 @@ pub enum CommandWithControlFlow<T> {
     Command(T),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum SomeCommand {
-    Pure {
-        cmd: CommandWithControlFlow<PureCommand>,
-    },
-    Write {
-        write_cmd: CommandWithControlFlow<WriteCommand>,
-    },
-}
-
-impl SomeCommand {
-    pub fn is_pure(&self) -> bool {
-        matches!(self, SomeCommand::Pure { .. })
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Rule {
     pub on: OnRule,
-    #[serde(flatten)]
-    pub some_cmd: SomeCommand,
+    pub cmd: CommandWithControlFlow<Command>,
 }
 
 impl Rule {
-    pub fn on_match(&self, target_path: &Path, force_pure: bool) -> bool {
-        if force_pure && !self.some_cmd.is_pure() {
-            return false;
-        }
-
+    pub fn on_match(&self, target_path: &Path) -> bool {
         self.on.on_match(target_path)
     }
 }
@@ -101,13 +72,13 @@ fn none<T>() -> Option<T> {
     None
 }
 
-fn collect_urls_from_pure_cmd(cmd: &CommandWithControlFlow<PureCommand>, urls: &mut Vec<Url>) {
+fn collect_urls(cmd: &CommandWithControlFlow<Command>, urls: &mut Vec<Url>) {
     match cmd {
-        CommandWithControlFlow::Command(PureCommand::PluginUrl(url)) => urls.push(url.clone()),
-        CommandWithControlFlow::Command(PureCommand::CommandIO { .. }) => {}
+        CommandWithControlFlow::Command(Command::PluginUrl(url)) => urls.push(url.clone()),
+        CommandWithControlFlow::Command(Command::CommandIO { .. }) => {}
         CommandWithControlFlow::Sequential(cmds) => {
             for c in cmds {
-                collect_urls_from_pure_cmd(c, urls);
+                collect_urls(c, urls);
             }
         }
         CommandWithControlFlow::If {
@@ -116,43 +87,18 @@ fn collect_urls_from_pure_cmd(cmd: &CommandWithControlFlow<PureCommand>, urls: &
             on_false,
             ..
         } => {
-            collect_urls_from_pure_cmd(run, urls);
-            collect_urls_from_pure_cmd(on_true, urls);
-            collect_urls_from_pure_cmd(on_false, urls);
-        }
-        CommandWithControlFlow::Set { .. } => {}
-    }
-}
-
-fn collect_urls_from_write_cmd(cmd: &CommandWithControlFlow<WriteCommand>, urls: &mut Vec<Url>) {
-    match cmd {
-        CommandWithControlFlow::Command(WriteCommand::Pure(PureCommand::PluginUrl(url))) => {
-            urls.push(url.clone())
-        }
-        CommandWithControlFlow::Command(_) => {}
-        CommandWithControlFlow::Sequential(cmds) => {
-            for c in cmds {
-                collect_urls_from_write_cmd(c, urls);
-            }
-        }
-        CommandWithControlFlow::If {
-            run,
-            on_true,
-            on_false,
-            ..
-        } => {
-            collect_urls_from_write_cmd(run, urls);
-            collect_urls_from_write_cmd(on_true, urls);
-            collect_urls_from_write_cmd(on_false, urls);
+            collect_urls(run, urls);
+            collect_urls(on_true, urls);
+            collect_urls(on_false, urls);
         }
         CommandWithControlFlow::Set { .. } => {}
     }
 }
 
 impl Config {
-    pub fn find_matched_rule(&self, target_path: &Path, force_pure: bool) -> Option<Rule> {
+    pub fn find_matched_rule(&self, target_path: &Path) -> Option<Rule> {
         for rule in &self.rules {
-            if rule.on_match(target_path, force_pure) {
+            if rule.on_match(target_path) {
                 return Some(rule.clone());
             }
         }
@@ -163,12 +109,7 @@ impl Config {
     pub fn all_plugin_urls(&self) -> Vec<Url> {
         let mut urls = Vec::new();
         for rule in &self.rules {
-            match &rule.some_cmd {
-                SomeCommand::Pure { cmd } => collect_urls_from_pure_cmd(cmd, &mut urls),
-                SomeCommand::Write { write_cmd } => {
-                    collect_urls_from_write_cmd(write_cmd, &mut urls)
-                }
-            }
+            collect_urls(&rule.cmd, &mut urls);
         }
         urls
     }
@@ -233,69 +174,21 @@ mod tests {
     }
 
     #[test]
-    fn test_some_command_is_pure() {
-        let pure_command = SomeCommand::Pure {
-            cmd: CommandWithControlFlow::Command(PureCommand::PluginUrl(
-                "https://example.com/plugin.dllpack".parse().unwrap(),
-            )),
-        };
-        assert!(
-            pure_command.is_pure(),
-            "Expected a pure command to be recognized as pure"
-        );
-
-        let write_command = SomeCommand::Write {
-            write_cmd: CommandWithControlFlow::Command(WriteCommand::SimpleCommand(
-                "echo Hello".to_string(),
-            )),
-        };
-        assert!(
-            !write_command.is_pure(),
-            "Expected a write command not to be recognized as pure"
-        );
-    }
-
-    #[test]
     fn test_rule_on_match() {
-        let pure_rule = Rule {
+        let rule = Rule {
             on: OnRule::Extension(".py".to_string()),
-            some_cmd: SomeCommand::Pure {
-                cmd: CommandWithControlFlow::Command(PureCommand::PluginUrl(
-                    "https://example.com/python_formatter.dllpack"
-                        .parse()
-                        .unwrap(),
-                )),
-            },
+            cmd: CommandWithControlFlow::Command(Command::PluginUrl(
+                "https://example.com/python_formatter.dllpack"
+                    .parse()
+                    .unwrap(),
+            )),
         };
 
         let path_py = Path::new("script.py");
-        assert!(
-            pure_rule.on_match(path_py, false),
-            "Should match `.py` extension in non-pure mode"
-        );
-        assert!(
-            pure_rule.on_match(path_py, true),
-            "Should match `.py` extension in pure mode"
-        );
-
-        let write_rule = Rule {
-            on: OnRule::Extension(".rs".to_string()),
-            some_cmd: SomeCommand::Write {
-                write_cmd: CommandWithControlFlow::Command(WriteCommand::SimpleCommand(
-                    "rustfmt {{ os-target }}".to_string(),
-                )),
-            },
-        };
+        assert!(rule.on_match(path_py), "Should match `.py` extension");
 
         let path_rs = Path::new("lib.rs");
-        assert!(
-            write_rule.on_match(path_rs, false),
-            "Should match `.rs` extension in non-pure mode"
-        );
-        assert!(
-            !write_rule.on_match(path_rs, true),
-            "Should not match if forced pure, but is a write command"
-        );
+        assert!(!rule.on_match(path_rs), "Should not match `.rs` extension");
     }
 
     #[test]
@@ -308,7 +201,7 @@ mod tests {
                 },
                 {
                     "on": ".rs",
-                    "write_cmd": "rustfmt {{ os-target }}"
+                    "cmd": "https://example.com/rustfmt.dllpack"
                 }
             ],
             "cache_dir": null,
@@ -318,29 +211,21 @@ mod tests {
         let config: Config = serde_json::from_str(json).expect("Should parse valid JSON");
 
         let path_ts = Path::new("app.ts");
-        let matched_ts = config.find_matched_rule(path_ts, false);
+        let matched_ts = config.find_matched_rule(path_ts);
         assert!(
             matched_ts.is_some(),
             "Should find a matching rule for `.ts`"
         );
-        assert!(
-            matched_ts.unwrap().some_cmd.is_pure(),
-            "Expected `.ts` rule to be a pure command"
-        );
 
         let path_rs = Path::new("main.rs");
-        let matched_rs = config.find_matched_rule(path_rs, false);
+        let matched_rs = config.find_matched_rule(path_rs);
         assert!(
             matched_rs.is_some(),
             "Should find a matching rule for `.rs`"
         );
-        assert!(
-            !matched_rs.unwrap().some_cmd.is_pure(),
-            "Expected `.rs` rule to be a write command"
-        );
 
         let path_py = Path::new("script.py");
-        let matched_py = config.find_matched_rule(path_py, false);
+        let matched_py = config.find_matched_rule(path_py);
         assert!(matched_py.is_none(), "No rule should match `.py`");
     }
 
@@ -368,7 +253,6 @@ mod tests {
 
         if let Some(Rule {
             on: OnRule::Or(rules),
-            some_cmd,
             ..
         }) = deserialized.rules.first()
         {
@@ -377,14 +261,13 @@ mod tests {
                 2,
                 "Expected two OnRule::Extension inside OnRule::Or"
             );
-            assert!(some_cmd.is_pure(), "Expected a pure command");
         } else {
-            panic!("Expected the first rule to be OnRule::Or with a pure command");
+            panic!("Expected the first rule to be OnRule::Or");
         }
     }
 
     #[test]
-    fn test_some_command_deserialize() {
+    fn test_command_deserialize() {
         let json_str_cmd = r#"
         {
           "on": ".ts",
@@ -392,33 +275,12 @@ mod tests {
         }
         "#;
 
-        let rule_cmd: Rule = serde_json::from_str(json_str_cmd).unwrap();
-        match &rule_cmd.some_cmd {
-            SomeCommand::Pure { cmd } => match cmd {
-                CommandWithControlFlow::Command(PureCommand::PluginUrl(url)) => {
-                    assert_eq!(url.as_str(), "https://example.com/plugin.dllpack");
-                }
-                _ => panic!("Expected a direct plugin URL in pure command"),
-            },
-            _ => panic!("Expected a pure command for `.ts`"),
-        }
-
-        let json_str_write_cmd = r#"
-        {
-          "on": ".rs",
-          "write_cmd": "rustfmt {{ os-target }}"
-        }
-        "#;
-
-        let rule_write_cmd: Rule = serde_json::from_str(json_str_write_cmd).unwrap();
-        match &rule_write_cmd.some_cmd {
-            SomeCommand::Write { write_cmd } => match write_cmd {
-                CommandWithControlFlow::Command(WriteCommand::SimpleCommand(s)) => {
-                    assert!(s.contains("rustfmt"));
-                }
-                _ => panic!("Expected a simple command for `.rs`"),
-            },
-            _ => panic!("Expected a write command for `.rs`"),
+        let rule: Rule = serde_json::from_str(json_str_cmd).unwrap();
+        match &rule.cmd {
+            CommandWithControlFlow::Command(Command::PluginUrl(url)) => {
+                assert_eq!(url.as_str(), "https://example.com/plugin.dllpack");
+            }
+            _ => panic!("Expected a direct plugin URL"),
         }
     }
 
@@ -431,7 +293,7 @@ mod tests {
             "on_false": "https://example.com/false.dllpack"
         }"#;
 
-        let if_command: CommandWithControlFlow<PureCommand> =
+        let if_command: CommandWithControlFlow<Command> =
             serde_json::from_str(json).expect("Should parse valid JSON");
 
         match if_command {
@@ -466,7 +328,7 @@ mod tests {
             "https://example.com/plugin2.dllpack"
         ]"#;
 
-        let sequential: CommandWithControlFlow<PureCommand> =
+        let sequential: CommandWithControlFlow<Command> =
             serde_json::from_str(json).expect("Should parse valid JSON");
 
         match sequential {
@@ -486,7 +348,7 @@ mod tests {
             }
         }"#;
 
-        let set_command: CommandWithControlFlow<PureCommand> =
+        let set_command: CommandWithControlFlow<Command> =
             serde_json::from_str(json).expect("Should parse valid JSON");
 
         match set_command {
@@ -542,41 +404,18 @@ mod tests {
     }
 
     #[test]
-    fn test_pure_command_command_io() {
+    fn test_command_io() {
         let json = r#"{
             "io": "cat {{ input }} | grep pattern"
         }"#;
 
-        let command_io: PureCommand = serde_json::from_str(json).expect("Should parse valid JSON");
+        let command_io: Command = serde_json::from_str(json).expect("Should parse valid JSON");
 
         match command_io {
-            PureCommand::CommandIO { io } => {
+            Command::CommandIO { io } => {
                 assert_eq!(io, "cat {{ input }} | grep pattern");
             }
             _ => panic!("Expected CommandIO variant"),
-        }
-    }
-
-    #[test]
-    fn test_write_command_variants() {
-        let simple_cmd_json = r#""echo 'Hello World'""#;
-
-        let simple_cmd: WriteCommand =
-            serde_json::from_str(simple_cmd_json).expect("Should parse valid JSON");
-        match simple_cmd {
-            WriteCommand::SimpleCommand(cmd) => {
-                assert_eq!(cmd, "echo 'Hello World'");
-            }
-            _ => panic!("Expected SimpleCommand variant"),
-        }
-
-        let pure_cmd_json = r#""https://example.com/plugin.dllpack""#;
-
-        let pure_cmd: WriteCommand =
-            serde_json::from_str(pure_cmd_json).expect("Should parse valid JSON");
-        match pure_cmd {
-            WriteCommand::Pure(_) => {}
-            _ => panic!("Expected Pure variant"),
         }
     }
 

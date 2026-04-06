@@ -2,27 +2,25 @@ use crate::app_dir::{AppDirResolver, DefaultAppDirResolver};
 use crate::bulk_format::{bulk_format, BulkFormatOption};
 use crate::cli::GlobalOptions;
 use crate::config::{load_config_and_cache, read_config_bytes};
-use crate::config::{Rule, SomeCommand};
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
     DaemonBulkFormatArgs, DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands,
-    DaemonFormatArgs, DaemonFormatResponse, DaemonInfo, DaemonPureFormatArgs,
-    DaemonPureFormatResponse, DaemonResponse, DaemonSocketPath, OutputPath,
+    DaemonFormatArgs, DaemonFormatResponse, DaemonInfo, DaemonResponse, DaemonSocketPath,
+    OutputPath,
 };
 use crate::daemon::startup_lock::StartupLock;
 use crate::daemon::uds::{UnixListener, UnixStream};
 use crate::debug_long;
-use crate::handle_plugin::run::{run, run_pure};
+use crate::handle_plugin::run::run;
 use crate::install_check::check_ready;
 use crate::log::IS_DAEMON_PROCESS;
-use crate::log::{DAEMON_THREAD_START, IS_DAEMON_MAIN_THREAD};
+use crate::log::IS_DAEMON_MAIN_THREAD;
 use crate::path_utils::{normalize_path, to_wasm_path};
 use crate::process_utils::get_start_time;
 use anyhow::Result;
 use anyhow::{anyhow, Context};
 use foro_plugin_utils::data_json_utils::JsonGetter;
-use log::{debug, error, info, trace, warn};
-use notify::Watcher;
+use log::{debug, error, info, warn};
 use serde_json::json;
 use std::fs::{DirBuilder, OpenOptions};
 use std::io::prelude::*;
@@ -33,8 +31,8 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, OnceLock};
 use std::thread::sleep;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use std::{fs, io, process, thread};
+use std::time::Duration;
+use std::{fs, process, thread};
 
 static DAEMON_INFO: OnceLock<DaemonInfo> = OnceLock::new();
 
@@ -43,152 +41,6 @@ pub fn daemon_format_execute_with_args(
     current_dir: PathBuf,
     global_options: GlobalOptions,
 ) -> Result<DaemonFormatResponse> {
-    let target_path = current_dir.join(&args.path).canonicalize()?;
-    let target_path_outer = target_path.clone();
-
-    let (tx, rx) = mpsc::channel();
-
-    let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(Instant::now));
-    let t_target_path = target_path.clone();
-
-    // Even if formatting command has finished (i.e., writing to the file has completed),
-    // there is still some delay before the function call returns due to memory cleanup and
-    // other processes. Therefore, we run it in a separate thread, monitor the file for changes,
-    // and have the main thread return the result immediately once a change is detected (or once
-    // the thread execution is complete).
-    //
-    // We refer to this here as a “quick trick”.
-
-    // todo: maybe to implement `?` operator to DaemonFormatResponse is better
-    let t = thread::spawn(move || -> Result<Option<DaemonFormatResponse>> {
-        DAEMON_THREAD_START.with(|start| {
-            let _ = start.set(parent_start_time);
-        });
-
-        let config_bytes = read_config_bytes(global_options.config_file.as_deref())?;
-        let (config, cache_dir) = load_config_and_cache(
-            global_options.config_file.as_deref(),
-            global_options.cache_dir.as_deref(),
-        )?;
-        check_ready(&config_bytes, &cache_dir)
-            .context("Plugins not installed: run `foro install` first")?;
-
-        // todo: why not fs::read ?
-        let file = fs::File::open(&t_target_path)?;
-        let mut buf_reader = io::BufReader::new(file);
-        let mut content = String::new();
-        buf_reader.read_to_string(&mut content)?;
-        drop(buf_reader);
-
-        let rule = match config.find_matched_rule(&t_target_path, false) {
-            Some(rule) => rule,
-            None => {
-                let reason = "No rule matched".to_string();
-                return Ok(Some(DaemonFormatResponse::Ignored(reason)));
-            }
-        };
-
-        debug_long!("run rule: {:?}", rule);
-
-        let res = run(
-            &rule.some_cmd,
-            json!({
-                "wasm-current-dir":  to_wasm_path(&current_dir)?,
-                "os-current-dir": normalize_path(&current_dir)?,
-                "wasm-target": to_wasm_path(&t_target_path)?,
-                "os-target": normalize_path(&t_target_path)?,
-                "raw-target": args.path,
-                "target-content": content,
-            }),
-            &cache_dir,
-            !global_options.no_cache,
-        )?;
-
-        debug_long!("{:?}", res);
-
-        if let Some(status) = String::get_value_opt(&res, ["format-status"]) {
-            match status.as_str() {
-                "ignored" => {
-                    let reason = String::get_value_opt(&res, ["ignored-reason"])
-                        .unwrap_or("File ignored".to_string());
-                    return Ok(Some(DaemonFormatResponse::Ignored(reason)));
-                }
-                "error" => {
-                    let error = String::get_value_opt(&res, ["format-error"]).context("Failed to get format error. Did you forget to return `format-error` in your plugin?")?;
-                    return Ok(Some(DaemonFormatResponse::Error(error)));
-                }
-                _ => {}
-            }
-        }
-
-        tx.send(0)?;
-
-        Ok(None)
-    });
-
-    let (w_tx, w_rx) = mpsc::channel();
-
-    let mut watcher = notify::RecommendedWatcher::new(
-        w_tx,
-        notify::Config::default().with_poll_interval(Duration::from_micros(100)),
-    )?;
-
-    watcher.watch(&target_path_outer, notify::RecursiveMode::NonRecursive)?;
-
-    loop {
-        if w_rx.try_recv().is_ok() {
-            debug!("quick trick detected file changed");
-            break;
-        }
-
-        if rx.try_recv().is_ok() {
-            debug!("quick trick detected child finished");
-            break;
-        }
-
-        if t.is_finished() {
-            break;
-        }
-
-        sleep(Duration::from_micros(10));
-    }
-
-    if t.is_finished() {
-        let res = t.join().unwrap();
-        match res {
-            Ok(Some(res)) => {
-                return Ok(res);
-            }
-            Err(err) => {
-                return Err(err);
-            }
-            _ => {}
-        }
-    }
-
-    debug!("main process exit");
-
-    let now = SystemTime::now();
-
-    // UNIXエポックからの経過時間を取得
-    let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-
-    // 秒とナノ秒をそれぞれ取得
-    let seconds = since_the_epoch.as_secs();
-    let nanoseconds = since_the_epoch.subsec_nanos();
-
-    // マイクロ秒単位の精度を計算
-    let microseconds = nanoseconds / 1_000;
-    println!("{seconds}.{microseconds:06}");
-
-    Ok(DaemonFormatResponse::Success())
-}
-
-pub fn daemon_pure_format_execute_with_args(
-    args: DaemonPureFormatArgs,
-    current_dir: PathBuf,
-    global_options: GlobalOptions,
-) -> Result<DaemonPureFormatResponse> {
     let target_path = current_dir.join(&args.path).canonicalize()?;
 
     let config_bytes = read_config_bytes(global_options.config_file.as_deref())?;
@@ -199,36 +51,19 @@ pub fn daemon_pure_format_execute_with_args(
     check_ready(&config_bytes, &cache_dir)
         .context("Plugins not installed: run `foro install` first")?;
 
-    let rule = match config.find_matched_rule(&target_path, true) {
+    let rule = match config.find_matched_rule(&target_path) {
         Some(rule) => rule,
         None => {
-            let found_rule_non_pure = config.find_matched_rule(&target_path, false).is_none();
-
-            let reason = if !found_rule_non_pure {
-                "No rule matched"
-            } else {
-                "No rule matched (but found non-pure rule)"
-            }
-            .to_string();
-
-            return Ok(DaemonPureFormatResponse::Ignored(reason));
+            return Ok(DaemonFormatResponse::Ignored(
+                "No rule matched".to_string(),
+            ));
         }
     };
 
     debug_long!("run rule: {:?}", rule);
 
-    let pure_cmd = match rule {
-        Rule {
-            some_cmd: SomeCommand::Pure { cmd },
-            ..
-        } => cmd,
-        _ => {
-            unreachable!()
-        }
-    };
-
-    let res = run_pure(
-        &pure_cmd,
+    let res = run(
+        &rule.cmd,
         json!({
             "wasm-current-dir":  to_wasm_path(&current_dir)?,
             "os-current-dir": normalize_path(&current_dir)?,
@@ -243,26 +78,20 @@ pub fn daemon_pure_format_execute_with_args(
 
     if let Some(status) = String::get_value_opt(&res, ["format-status"]) {
         match status.as_str() {
-            "success" => {
-                let formatted = String::get_value_opt(&res, ["formatted-content"]).context("Failed to get formatted content. Did you forget to return `formatted-content` in your plugin?")?;
-                return Ok(DaemonPureFormatResponse::Success(formatted));
-            }
             "ignored" => {
                 let reason = String::get_value_opt(&res, ["ignored-reason"])
                     .unwrap_or("File ignored".to_string());
-                return Ok(DaemonPureFormatResponse::Ignored(reason));
+                return Ok(DaemonFormatResponse::Ignored(reason));
             }
             "error" => {
                 let error = String::get_value_opt(&res, ["format-error"]).context("Failed to get format error. Did you forget to return `format-error` in your plugin?")?;
-                return Ok(DaemonPureFormatResponse::Error(error));
+                return Ok(DaemonFormatResponse::Error(error));
             }
             _ => {}
         }
     }
 
-    Ok(DaemonPureFormatResponse::Error(
-        "Plugin does not return valid value".to_string(),
-    ))
+    Ok(DaemonFormatResponse::Success())
 }
 
 pub fn daemon_bulk_format_execute_with_args(
@@ -325,20 +154,8 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 
             match res {
                 Ok(res) => DaemonResponse::Format(res),
-                Err(err) => DaemonResponse::Format(DaemonFormatResponse::Error(format!("{err:#}"))),
-            }
-        }
-        DaemonCommands::PureFormat(s_args) => {
-            let res = daemon_pure_format_execute_with_args(
-                s_args,
-                payload.current_dir,
-                payload.global_options,
-            );
-
-            match res {
-                Ok(res) => DaemonResponse::PureFormat(res),
                 Err(err) => {
-                    DaemonResponse::PureFormat(DaemonPureFormatResponse::Error(format!("{err:#}")))
+                    DaemonResponse::Format(DaemonFormatResponse::Error(format!("{err:#}")))
                 }
             }
         }
@@ -388,7 +205,7 @@ fn read_stream_with_retry(stream: &mut UnixStream, buf: &mut Vec<u8>) -> Result<
         }
     }
 
-    trace!("read socket input with {} retry", retry_cnt);
+    log::trace!("read socket input with {} retry", retry_cnt);
 
     Ok(())
 }
@@ -397,7 +214,7 @@ fn handle_client(mut stream: UnixStream, stop_sender: Sender<()>) -> Result<()> 
     let mut buf = Vec::new();
     read_stream_with_retry(&mut stream, &mut buf)?;
 
-    trace!("{:?}", String::from_utf8_lossy(&buf));
+    log::trace!("{:?}", String::from_utf8_lossy(&buf));
 
     #[cfg(target_os = "linux")]
     stream.shutdown(Shutdown::Read)?;

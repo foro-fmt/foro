@@ -1,9 +1,7 @@
 use crate::cli::GlobalOptions;
 use crate::config::load_paths;
 use crate::daemon::client::{ensure_daemon_running, run_command as daemon_run_command};
-use crate::daemon::interface::{
-    DaemonBulkFormatArgs, DaemonCommands, DaemonFormatArgs, DaemonSocketPath,
-};
+use crate::daemon::interface::{DaemonBulkFormatArgs, DaemonCommands, DaemonFormatArgs, DaemonSocketPath};
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
@@ -31,9 +29,11 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
 
     // If only one path is given and it's a file, use Format command
     if args.paths.len() == 1 && args.paths[0].is_file() {
+        let content = std::fs::read_to_string(&args.paths[0])?;
         daemon_run_command(
             DaemonCommands::Format(DaemonFormatArgs {
                 path: args.paths[0].clone(),
+                content,
             }),
             global_options,
             &socket,

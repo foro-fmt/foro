@@ -8,12 +8,6 @@ use std::path::{Path, PathBuf};
 pub struct DaemonFormatArgs {
     /// Path to format
     pub path: PathBuf,
-}
-
-#[derive(Parser, Serialize, Deserialize, Debug)]
-pub struct DaemonPureFormatArgs {
-    /// Path to format
-    pub path: PathBuf,
     pub content: String,
 }
 
@@ -28,7 +22,6 @@ pub struct DaemonBulkFormatArgs {
 #[derive(Parser, Serialize, Deserialize, Debug)]
 pub enum DaemonCommands {
     Format(DaemonFormatArgs),
-    PureFormat(DaemonPureFormatArgs),
     BulkFormat(DaemonBulkFormatArgs),
     Stop,
     Ping,
@@ -49,13 +42,6 @@ pub enum DaemonFormatResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum DaemonPureFormatResponse {
-    Success(String),
-    Ignored(String), // Ignored with reason
-    Error(String),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonBulkFormatResponse {
     Success(String),
     Error(String),
@@ -64,7 +50,6 @@ pub enum DaemonBulkFormatResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonResponse {
     Format(DaemonFormatResponse),
-    PureFormat(DaemonPureFormatResponse),
     BulkFormat(DaemonBulkFormatResponse),
     Stop,
     Pong(DaemonInfo),
