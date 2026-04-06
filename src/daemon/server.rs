@@ -4,9 +4,9 @@ use crate::cli::GlobalOptions;
 use crate::config::{load_config_and_cache, read_config_bytes};
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
-    DaemonBulkFormatArgs, DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands,
-    DaemonFormatArgs, DaemonFormatResponse, DaemonInfo, DaemonResponse, DaemonSocketPath,
-    OutputPath,
+    BulkFormatSummary, DaemonBulkFormatArgs, DaemonBulkFormatResponse, DaemonCommandPayload,
+    DaemonCommands, DaemonFormatArgs, DaemonFormatResponse, DaemonInfo, DaemonResponse,
+    DaemonSocketPath, OutputPath,
 };
 use crate::daemon::startup_lock::StartupLock;
 use crate::daemon::uds::{UnixListener, UnixStream};
@@ -124,20 +124,11 @@ pub fn daemon_bulk_format_execute_with_args(
     };
 
     let (changed_count, unchanged_count) = bulk_format(&opt, &config, &cache_dir, true)?;
-    let total_count = changed_count + unchanged_count;
-
-    let message = if changed_count > 0 {
-        format!(
-            "{} files processed. {} {} changed.",
-            total_count,
-            changed_count,
-            if changed_count == 1 { "file" } else { "files" }
-        )
-    } else {
-        format!("{total_count} files processed. No files changed.")
-    };
-
-    Ok(DaemonBulkFormatResponse::Success(message))
+    Ok(DaemonBulkFormatResponse::Success(BulkFormatSummary {
+        total_count: changed_count + unchanged_count,
+        changed_count,
+        unchanged_count,
+    }))
 }
 
 pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse {

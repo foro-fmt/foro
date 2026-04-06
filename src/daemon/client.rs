@@ -1,8 +1,8 @@
 use crate::build_info::get_build_id;
 use crate::cli::GlobalOptions;
 use crate::daemon::interface::{
-    DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands, DaemonFormatResponse,
-    DaemonResponse, DaemonSocketPath,
+    BulkFormatSummary, DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands,
+    DaemonFormatResponse, DaemonResponse, DaemonSocketPath,
 };
 use crate::daemon::server::start_daemon;
 use crate::daemon::startup_lock::StartupLock;
@@ -224,8 +224,11 @@ pub fn run_command(
         DaemonResponse::Format(DaemonFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
         }
-        DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Success(message)) => {
-            eprintln!("Formatted successfully: {}", message);
+        DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Success(summary)) => {
+            eprintln!(
+                "Formatted successfully: {}",
+                format_bulk_success_message(summary)
+            );
         }
         DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
@@ -243,4 +246,21 @@ pub fn run_command(
     }
 
     Ok(())
+}
+
+fn format_bulk_success_message(summary: BulkFormatSummary) -> String {
+    if summary.changed_count > 0 {
+        format!(
+            "{} files processed. {} {} changed.",
+            summary.total_count,
+            summary.changed_count,
+            if summary.changed_count == 1 {
+                "file"
+            } else {
+                "files"
+            }
+        )
+    } else {
+        format!("{} files processed. No files changed.", summary.total_count)
+    }
 }
