@@ -1,0 +1,10 @@
+{
+	"rules": [
+		{
+			"on": ".txt",
+			"cmd": {
+				"io": "foro_missing_command_for_bulk_error_test"
+			}
+		}
+	]
+}

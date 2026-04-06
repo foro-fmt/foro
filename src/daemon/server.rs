@@ -123,19 +123,22 @@ pub fn daemon_bulk_format_execute_with_args(
         current_dir,
     };
 
-    let (changed_count, unchanged_count) = bulk_format(&opt, &config, &cache_dir, true)?;
-    let total_count = changed_count + unchanged_count;
-
-    let message = if changed_count > 0 {
-        format!(
-            "{} files processed. {} {} changed.",
-            total_count,
-            changed_count,
-            if changed_count == 1 { "file" } else { "files" }
-        )
+    let summary = bulk_format(&opt, &config, &cache_dir, true)?;
+    let total_count = summary.processed_count();
+    let error_label = if summary.error_count == 1 {
+        "error"
     } else {
-        format!("{total_count} files processed. No files changed.")
+        "errors"
     };
+
+    let message = format!(
+        "{total_count} files processed. {} changed, {} unchanged, {} ignored, {} {}.",
+        summary.changed_count,
+        summary.unchanged_count,
+        summary.ignored_count,
+        summary.error_count,
+        error_label
+    );
 
     Ok(DaemonBulkFormatResponse::Success(message))
 }
