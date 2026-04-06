@@ -264,3 +264,35 @@ fn format_bulk_success_message(summary: BulkFormatSummary) -> String {
         format!("{} files processed. No files changed.", summary.total_count)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::format_bulk_success_message;
+    use crate::daemon::interface::BulkFormatSummary;
+
+    #[test]
+    fn format_bulk_success_message_reports_no_changes() {
+        let summary = BulkFormatSummary {
+            total_count: 3,
+            changed_count: 0,
+        };
+
+        assert_eq!(
+            format_bulk_success_message(summary),
+            "3 files processed. No files changed."
+        );
+    }
+
+    #[test]
+    fn format_bulk_success_message_reports_changed_files() {
+        let summary = BulkFormatSummary {
+            total_count: 3,
+            changed_count: 2,
+        };
+
+        assert_eq!(
+            format_bulk_success_message(summary),
+            "3 files processed. 2 files changed."
+        );
+    }
+}
