@@ -49,11 +49,6 @@ pub struct GlobalOptions {
     #[serde(default)]
     pub socket_dir: Option<PathBuf>,
 
-    /// Avoid reading from or writing to the cache
-    #[arg(long, default_value = "false", global = true)]
-    #[serde(default = "true_")]
-    pub no_cache: bool,
-
     #[arg(long, default_value = "false", global = true)]
     #[serde(default = "false_")]
     pub long_log: bool,

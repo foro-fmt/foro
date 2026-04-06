@@ -297,7 +297,6 @@ Here's a quick overview of `foro`'s commands:
 * `--config-file <PATH>`: Path to a custom `foro.json` file.
 * `--cache-dir <PATH>`: Path to a custom cache directory.
 * `--socket-dir <PATH>`: Path to a custom directory for the daemon socket.
-* `--no-cache`: Disables reading from or writing to the cache for the current command.
 * `--verbose (-v, -vv, ...)`: Increases log verbosity.
 * `--long-log`: Enables more detailed log format.
 * `--ignore-build-id-mismatch`: Prevents daemon restart if client and daemon have different build IDs.

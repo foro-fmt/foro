@@ -71,7 +71,7 @@ pub fn daemon_format_execute_with_args(
             "target-content": args.content,
         }),
         &cache_dir,
-        !global_options.no_cache,
+        true,
     )?;
 
     if let Some(status) = String::get_value_opt(&res, ["format-status"]) {
@@ -123,8 +123,7 @@ pub fn daemon_bulk_format_execute_with_args(
         current_dir,
     };
 
-    let (changed_count, unchanged_count) =
-        bulk_format(&opt, &config, &cache_dir, !global_options.no_cache)?;
+    let (changed_count, unchanged_count) = bulk_format(&opt, &config, &cache_dir, true)?;
     let total_count = changed_count + unchanged_count;
 
     let message = if changed_count > 0 {

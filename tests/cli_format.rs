@@ -225,20 +225,6 @@ fn test_cli_format_rules() {
 
 #[test]
 #[ignore]
-fn test_cli_format_no_cache() {
-    // This test is ignored because it's really slow! (~30s)
-
-    let env = TestEnvBuilder::new()
-        .fixture_path("./tests/fixtures/cli_format_rust/basic/")
-        .cache_dir("./cache/")
-        .build();
-
-    env.foro(&["format", "./main.rs"]);
-    env.assert_eq("main.rs", "expected.rs");
-}
-
-#[test]
-#[ignore]
 fn test_cli_format_parallel() {
     // When two foro formats are running simultaneously and dllpack is downloaded at the same time,
     // cache conflicts may occur (in improper implementations), resulting in errors.
