@@ -12,7 +12,7 @@ use serde_json::json;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 use std::time::Instant;
 use std::{fs, io, thread};
 
@@ -114,12 +114,32 @@ pub fn bulk_format(
     let changed_count = Arc::new(AtomicUsize::new(0)); // Count of files that were changed
     let unchanged_count = Arc::new(AtomicUsize::new(0)); // Count of files that were not changed
 
-    let mut worker_senders = Vec::with_capacity(worker_count);
+    let walk = walk_builder.build();
+    let mut files = Vec::new();
+    for entry_res in walk {
+        match entry_res {
+            Ok(dir_entry) => {
+                let path = dir_entry.path().to_path_buf();
+
+                if path.is_dir() {
+                    continue;
+                }
+
+                files.push(path);
+            }
+            Err(err) => {
+                error!("Error reading entry: {}", err);
+            }
+        }
+    }
+
+    let files = Arc::new(files);
+    let next_index = Arc::new(AtomicUsize::new(0));
+
     let mut worker_threads = Vec::with_capacity(worker_count);
     for _ in 0..worker_count {
-        let (tx, rx) = mpsc::sync_channel::<Option<PathBuf>>(1);
-        worker_senders.push(tx);
-
+        let files = files.clone();
+        let next_index = next_index.clone();
         let config = config.clone();
         let cache_path = cache_path.to_path_buf();
         let changed_count = changed_count.clone();
@@ -130,13 +150,15 @@ pub fn bulk_format(
                 let _ = start.set(parent_start_time);
             });
 
-            while let Ok(job) = rx.recv() {
-                let Some(path) = job else {
+            loop {
+                let index = next_index.fetch_add(1, Ordering::SeqCst);
+                if index >= files.len() {
                     break;
-                };
+                }
 
+                let path = &files[index];
                 let res = format_file(
-                    &path,
+                    path,
                     path.parent().unwrap(),
                     &config,
                     &cache_path,
@@ -159,34 +181,6 @@ pub fn bulk_format(
         });
 
         worker_threads.push(worker);
-    }
-
-    let walk = walk_builder.build();
-    let mut next_worker = 0usize;
-    for entry_res in walk {
-        match entry_res {
-            Ok(dir_entry) => {
-                let path = dir_entry.path().to_path_buf();
-
-                if path.is_dir() {
-                    continue;
-                }
-
-                let target_worker = next_worker % worker_count;
-                next_worker += 1;
-
-                if worker_senders[target_worker].send(Some(path)).is_err() {
-                    error!("Worker thread exited before receiving all tasks");
-                }
-            }
-            Err(err) => {
-                error!("Error reading entry: {}", err);
-            }
-        }
-    }
-
-    for tx in worker_senders {
-        let _ = tx.send(None);
     }
 
     for t in worker_threads {
