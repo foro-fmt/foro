@@ -421,7 +421,7 @@ fn wait_for_daemon_ready(
     child: &mut process::Child,
     timeout: Duration,
 ) -> Result<()> {
-    let started = Instant::now();
+    let started = std::time::Instant::now();
     let mut last_ping_error: Option<anyhow::Error> = None;
 
     while started.elapsed() < timeout {
