@@ -29,7 +29,7 @@ pub(crate) fn get_or_create_default_config_with<R: AppDirResolver>(
         fs::write(&config_path, default_config).ok()?;
 
         info!("created default config file: {:?}", config_path);
-        info!("content: {:?}", default_config);
+        debug!("content: {:?}", default_config);
     }
 
     Some(config_path)

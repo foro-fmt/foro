@@ -326,9 +326,9 @@ pub fn daemon_main(socket: WrappedUnixSocket) {
             Ok((stream, _)) => {
                 let t_tx = tx.clone();
                 thread::spawn(move || {
-                    info!("New client connected");
+                    debug!("New client connected");
                     handle_client(stream, t_tx).unwrap();
-                    info!("Client exited");
+                    debug!("Client exited");
                 });
             }
             Err(err) if err.kind() == ErrorKind::WouldBlock => {}
