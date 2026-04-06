@@ -12,7 +12,7 @@ use serde_json::json;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::Instant;
 use std::{fs, io, thread};
 
@@ -84,13 +84,14 @@ pub fn bulk_format(
 ) -> Result<(usize, usize)> {
     // Returns (count of changed files, count of unchanged files)
     let (fst, rest) = opt.paths.split_first().context("No path given")?;
+    let worker_count = opt.threads.max(1);
 
     let mut walk_builder = WalkBuilder::new(fst);
     for path in rest {
         walk_builder.add(path);
     }
 
-    walk_builder.threads(opt.threads);
+    walk_builder.threads(worker_count);
     walk_builder.add_custom_ignore_filename(".foro-ignore");
 
     if opt.use_default_ignore {
@@ -113,64 +114,74 @@ pub fn bulk_format(
 
     let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(Instant::now));
 
-    let formatting_threads = Arc::new(Mutex::new(Vec::new()));
+    let (work_tx, work_rx) = mpsc::channel::<PathBuf>();
+    let work_rx = Arc::new(Mutex::new(work_rx));
+    let mut workers = Vec::with_capacity(worker_count);
     let changed_count = Arc::new(AtomicUsize::new(0)); // Count of files that were changed
     let unchanged_count = Arc::new(AtomicUsize::new(0)); // Count of files that were not changed
-    let running_count = Arc::new(AtomicUsize::new(0));
 
-    walk.run(|| {
-        Box::new(|entry_res| {
+    for _ in 0..worker_count {
+        let config = config.clone();
+        let cache_path = cache_path.to_path_buf();
+        let changed_count = changed_count.clone();
+        let unchanged_count = unchanged_count.clone();
+        let work_rx = work_rx.clone();
+
+        workers.push(thread::spawn(move || {
+            DAEMON_THREAD_START.with(|start| {
+                let _ = start.set(parent_start_time);
+            });
+
+            loop {
+                let path = {
+                    let rx = work_rx.lock().unwrap();
+                    rx.recv()
+                };
+
+                let path = match path {
+                    Ok(path) => path,
+                    Err(_) => break,
+                };
+
+                let res = format_file(
+                    &path,
+                    path.parent().unwrap(),
+                    &config,
+                    &cache_path,
+                    use_cache,
+                );
+
+                match res {
+                    Ok(was_changed) => {
+                        if was_changed {
+                            changed_count.fetch_add(1, Ordering::SeqCst);
+                        } else {
+                            unchanged_count.fetch_add(1, Ordering::SeqCst);
+                        }
+                    }
+                    Err(err) => {
+                        error!("Error formatting file: {}", err);
+                    }
+                }
+            }
+        }));
+    }
+
+    let walk_tx = work_tx.clone();
+    walk.run(move || {
+        let work_tx = walk_tx.clone();
+        Box::new(move |entry_res| {
             match entry_res {
                 Ok(dir_entry) => {
-                    let opt = opt.clone();
-                    let config = config.clone();
-                    let cache_path = cache_path.to_path_buf();
-                    let changed_count = changed_count.clone();
-                    let unchanged_count = unchanged_count.clone();
-                    let running_count = running_count.clone();
-
                     let path = dir_entry.path().to_path_buf();
 
                     if path.is_dir() {
                         return WalkState::Continue;
                     }
 
-                    let t = thread::spawn(move || {
-                        DAEMON_THREAD_START.with(|start| {
-                            let _ = start.set(parent_start_time);
-                        });
-
-                        while running_count.load(Ordering::SeqCst) >= opt.threads {
-                            thread::sleep(std::time::Duration::from_micros(100));
-                        }
-
-                        running_count.fetch_add(1, Ordering::SeqCst);
-
-                        let res = format_file(
-                            &path,
-                            path.parent().unwrap(),
-                            &config,
-                            &cache_path,
-                            use_cache,
-                        );
-
-                        running_count.fetch_sub(1, Ordering::SeqCst);
-
-                        match res {
-                            Ok(was_changed) => {
-                                if was_changed {
-                                    changed_count.fetch_add(1, Ordering::SeqCst);
-                                } else {
-                                    unchanged_count.fetch_add(1, Ordering::SeqCst);
-                                }
-                            }
-                            Err(err) => {
-                                error!("Error formatting file: {}", err);
-                            }
-                        }
-                    });
-
-                    formatting_threads.lock().unwrap().push(t);
+                    if let Err(err) = work_tx.send(path) {
+                        error!("Error scheduling file: {}", err);
+                    }
                 }
                 Err(err) => {
                     error!("Error reading entry: {}", err);
@@ -181,12 +192,10 @@ pub fn bulk_format(
         })
     });
 
-    for t in Arc::try_unwrap(formatting_threads)
-        .unwrap()
-        .into_inner()
-        .unwrap()
-    {
-        t.join().unwrap();
+    drop(work_tx);
+
+    for worker in workers {
+        worker.join().unwrap();
     }
 
     Ok((
