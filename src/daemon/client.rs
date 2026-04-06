@@ -217,16 +217,16 @@ pub fn run_command(
 
     match run_command_inner(command, global_options, stream, None)? {
         DaemonResponse::Format(DaemonFormatResponse::Success()) => {
-            info!("Success to format");
+            eprintln!("Formatted successfully.");
         }
         DaemonResponse::Format(DaemonFormatResponse::Ignored(reason)) => {
-            info!("File ignored. reason: {}", reason);
+            eprintln!("File ignored: {}", reason);
         }
         DaemonResponse::Format(DaemonFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
         }
         DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Success(message)) => {
-            info!("Success to format: {}", message);
+            eprintln!("Formatted successfully: {}", message);
         }
         DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Error(err)) => {
             return Err(anyhow!(err));

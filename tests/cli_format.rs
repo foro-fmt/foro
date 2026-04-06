@@ -220,7 +220,7 @@ fn test_cli_format_rules() {
 
     assert!(output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("File ignored. reason: No rule matched"))
+    assert!(stderr.contains("File ignored: No rule matched"))
 }
 
 #[test]

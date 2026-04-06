@@ -13,8 +13,8 @@ use crate::daemon::uds::{UnixListener, UnixStream};
 use crate::debug_long;
 use crate::handle_plugin::run::run;
 use crate::install_check::check_ready;
-use crate::log::IS_DAEMON_PROCESS;
 use crate::log::IS_DAEMON_MAIN_THREAD;
+use crate::log::IS_DAEMON_PROCESS;
 use crate::path_utils::{normalize_path, to_wasm_path};
 use crate::process_utils::get_start_time;
 use anyhow::Result;
@@ -54,9 +54,7 @@ pub fn daemon_format_execute_with_args(
     let rule = match config.find_matched_rule(&target_path) {
         Some(rule) => rule,
         None => {
-            return Ok(DaemonFormatResponse::Ignored(
-                "No rule matched".to_string(),
-            ));
+            return Ok(DaemonFormatResponse::Ignored("No rule matched".to_string()));
         }
     };
 
@@ -154,9 +152,7 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
 
             match res {
                 Ok(res) => DaemonResponse::Format(res),
-                Err(err) => {
-                    DaemonResponse::Format(DaemonFormatResponse::Error(format!("{err:#}")))
-                }
+                Err(err) => DaemonResponse::Format(DaemonFormatResponse::Error(format!("{err:#}"))),
             }
         }
         DaemonCommands::BulkFormat(s_args) => {
@@ -326,9 +322,9 @@ pub fn daemon_main(socket: WrappedUnixSocket) {
             Ok((stream, _)) => {
                 let t_tx = tx.clone();
                 thread::spawn(move || {
-                    info!("New client connected");
+                    debug!("New client connected");
                     handle_client(stream, t_tx).unwrap();
-                    info!("Client exited");
+                    debug!("Client exited");
                 });
             }
             Err(err) if err.kind() == ErrorKind::WouldBlock => {}

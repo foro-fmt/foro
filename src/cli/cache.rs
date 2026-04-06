@@ -5,7 +5,7 @@ use anyhow::Result;
 use clap::Parser;
 use dialoguer::Confirm;
 use dll_pack::resolve::get_all_cached_dependencies;
-use log::{debug, error, info};
+use log::debug;
 use std::fs;
 use std::str::FromStr;
 use url::Url;
@@ -45,7 +45,7 @@ pub fn cache_clean_execute_with_args(
         debug!("answer: {:?}", answer);
 
         if !answer {
-            error!("User aborted the operation");
+            eprintln!("Aborted.");
             return Ok(());
         }
     }
@@ -97,11 +97,11 @@ pub fn cache_remove_execute_with_args(
 
     match cached_locations {
         None => {
-            info!("No cache found for the URL: {:?}", url);
+            eprintln!("No cache found for: {:?}", url);
         }
         Some(deps) => {
             for (dep_url, loc) in deps {
-                info!("Removing cache for the URL: {:?}", dep_url);
+                eprintln!("Removing cache for: {:?}", dep_url);
 
                 if loc.is_dir() {
                     fs::remove_dir_all(&loc)
