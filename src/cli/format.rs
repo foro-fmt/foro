@@ -1,7 +1,9 @@
 use crate::cli::GlobalOptions;
 use crate::config::load_paths;
 use crate::daemon::client::{ensure_daemon_running, run_command as daemon_run_command};
-use crate::daemon::interface::{DaemonBulkFormatArgs, DaemonCommands, DaemonFormatArgs, DaemonSocketPath};
+use crate::daemon::interface::{
+    DaemonBulkFormatArgs, DaemonCommands, DaemonFormatArgs, DaemonSocketPath,
+};
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
