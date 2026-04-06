@@ -1,12 +1,16 @@
 use crate::cli::GlobalOptions;
 use crate::config::load_config_and_socket;
 use crate::daemon::client::{daemon_is_alive, run_command, DaemonStatus};
-use crate::daemon::interface::{DaemonCommands, DaemonSocketPath};
+use crate::daemon::interface::{
+    DaemonBulkFormatArgs, DaemonCommands, DaemonExecutionOptions, DaemonFormatArgs,
+    DaemonSocketPath,
+};
 use crate::daemon::server::start_daemon;
 use crate::daemon::startup_lock::StartupLock;
 use anyhow::Result;
 use clap::Parser;
 use log::info;
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 pub struct DaemonStartArgs {
@@ -51,9 +55,51 @@ pub struct DaemonRestartArgs {
 }
 
 #[derive(Parser, Debug)]
+pub struct DaemonFormatCliArgs {
+    /// Path to format
+    pub path: PathBuf,
+    pub content: String,
+}
+
+#[derive(Parser, Debug)]
+pub struct DaemonBulkFormatCliArgs {
+    /// Paths to format
+    pub paths: Vec<PathBuf>,
+    /// Number of threads to use
+    pub threads: usize,
+}
+
+#[derive(Parser, Debug)]
+pub enum DaemonServerCommands {
+    Format(DaemonFormatCliArgs),
+    BulkFormat(DaemonBulkFormatCliArgs),
+    Stop,
+    Ping,
+}
+
+impl From<DaemonServerCommands> for DaemonCommands {
+    fn from(value: DaemonServerCommands) -> Self {
+        match value {
+            DaemonServerCommands::Format(args) => DaemonCommands::Format(DaemonFormatArgs {
+                path: args.path,
+                content: args.content,
+            }),
+            DaemonServerCommands::BulkFormat(args) => {
+                DaemonCommands::BulkFormat(DaemonBulkFormatArgs {
+                    paths: args.paths,
+                    threads: args.threads,
+                })
+            }
+            DaemonServerCommands::Stop => DaemonCommands::Stop,
+            DaemonServerCommands::Ping => DaemonCommands::Ping,
+        }
+    }
+}
+
+#[derive(Parser, Debug)]
 pub enum DaemonSubcommands {
     #[clap(flatten)]
-    ServerCommands(DaemonCommands),
+    ServerCommands(DaemonServerCommands),
     Start(DaemonStartArgs),
     Restart(DaemonRestartArgs),
 }
@@ -81,8 +127,9 @@ pub fn daemon_restart_execute_with_args(
     }
 
     let lock = StartupLock::acquire(&socket_dir)?;
+    let daemon_options = DaemonExecutionOptions::from(&global_options);
 
-    run_command(DaemonCommands::Stop, global_options, &socket, true)?;
+    run_command(DaemonCommands::Stop, daemon_options, &socket, true)?;
 
     start_daemon(&socket, lock, args.attach)?;
 
@@ -104,8 +151,9 @@ pub fn daemon_execute_with_args(args: DaemonArgs, global_options: GlobalOptions)
             )?;
 
             let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
+            let daemon_options = DaemonExecutionOptions::from(&global_options);
 
-            run_command(command, global_options, &socket, true)?;
+            run_command(command.into(), daemon_options, &socket, true)?;
         }
     }
 
