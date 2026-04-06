@@ -91,9 +91,15 @@ fn format_file(
                 return Ok(FormatFileOutcome::Ignored);
             }
             "error" => {
-                let format_error = String::get_value_opt(&res, ["format-error"])
-                    .unwrap_or_else(|| "File formatting failed".to_string());
-                return Err(anyhow!(format_error));
+                return Err(match String::get_value_opt(&res, ["format-error"]) {
+                    Some(format_error) => {
+                        anyhow!("File formatting failed for {:?}: {}", path, format_error)
+                    }
+                    None => anyhow!(
+                        "Formatter plugin returned format-status=error without format-error for {:?}",
+                        path
+                    ),
+                });
             }
             _ => {}
         }
@@ -109,7 +115,7 @@ fn format_file(
         FormatFileOutcome::Unchanged
     };
 
-    info!("Success to format: {:?} ({:?})", path, outcome);
+    info!("Successfully formatted: {:?} ({:?})", path, outcome);
 
     Ok(outcome)
 }
@@ -209,7 +215,7 @@ pub fn bulk_format(
                             }
                             Err(err) => {
                                 error_count.fetch_add(1, Ordering::SeqCst);
-                                error!("Error formatting file: {}", err);
+                                error!("Error formatting file {}: {err:#}", path.display());
                             }
                         }
                     });
