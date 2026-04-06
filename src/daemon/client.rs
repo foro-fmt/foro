@@ -1,8 +1,7 @@
 use crate::build_info::get_build_id;
-use crate::cli::GlobalOptions;
 use crate::daemon::interface::{
-    DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands, DaemonFormatResponse,
-    DaemonResponse, DaemonSocketPath,
+    DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands, DaemonExecutionOptions,
+    DaemonFormatResponse, DaemonResponse, DaemonSocketPath,
 };
 use crate::daemon::server::start_daemon;
 use crate::daemon::startup_lock::StartupLock;
@@ -76,13 +75,7 @@ pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
         Ok(stream) => {
             match run_command_inner(
                 DaemonCommands::Ping,
-                GlobalOptions {
-                    config_file: None,
-                    cache_dir: None,
-                    socket_dir: None,
-                    long_log: false,
-                    ignore_build_id_mismatch: false,
-                },
+                DaemonExecutionOptions::default(),
                 stream,
                 Some(Duration::from_secs(1)),
             ) {
@@ -111,21 +104,21 @@ pub fn ping(socket: &DaemonSocketPath) -> Result<bool> {
 
 fn run_command_inner(
     command: DaemonCommands,
-    mut global_options: GlobalOptions,
+    mut execution_options: DaemonExecutionOptions,
     mut stream: UnixStream,
     timeout: Option<Duration>,
 ) -> Result<DaemonResponse> {
     let cwd = current_dir()?;
 
     // Convert relative config_file path to absolute path
-    if let Some(config_file) = global_options.config_file {
-        global_options.config_file = Some(cwd.join(config_file).canonicalize()?);
+    if let Some(config_file) = execution_options.config_file {
+        execution_options.config_file = Some(cwd.join(config_file).canonicalize()?);
     }
 
     let buf = serde_json::to_vec(&DaemonCommandPayload {
         command,
         current_dir: cwd,
-        global_options,
+        execution_options,
     })?;
     stream.write_all(&buf)?;
 
@@ -144,7 +137,7 @@ fn run_command_inner(
 
 pub fn ensure_daemon_running(
     socket: &DaemonSocketPath,
-    global_options: &GlobalOptions,
+    execution_options: &DaemonExecutionOptions,
 ) -> Result<()> {
     let lock = StartupLock::acquire(&socket.socket_dir)?;
 
@@ -158,7 +151,7 @@ pub fn ensure_daemon_running(
             let current_build_id = get_build_id();
 
             if daemon_build_id != &current_build_id {
-                if global_options.ignore_build_id_mismatch {
+                if execution_options.ignore_build_id_mismatch {
                     warn!("Daemon was built with a different build ID (daemon: {}, client: {}). Continuing without restart due to --ignore-build-id-mismatch flag.",
                         daemon_build_id, current_build_id);
                 } else {
@@ -168,7 +161,7 @@ pub fn ensure_daemon_running(
                     let stop_stream = UnixStream::connect(&socket.socket_path)?;
                     let _ = run_command_inner(
                         DaemonCommands::Stop,
-                        global_options.clone(),
+                        execution_options.clone(),
                         stop_stream,
                         None,
                     )?;
@@ -188,7 +181,7 @@ pub fn ensure_daemon_running(
 /// and outputs the result.
 pub fn run_command(
     command: DaemonCommands,
-    global_options: GlobalOptions,
+    execution_options: DaemonExecutionOptions,
     socket: &DaemonSocketPath,
     check_alive: bool,
 ) -> Result<()> {
@@ -214,7 +207,7 @@ pub fn run_command(
 
     let stream = UnixStream::connect(&socket.socket_path)?;
 
-    match run_command_inner(command, global_options, stream, None)? {
+    match run_command_inner(command, execution_options, stream, None)? {
         DaemonResponse::Format(DaemonFormatResponse::Success()) => {
             eprintln!("Formatted successfully.");
         }

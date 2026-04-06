@@ -17,6 +17,7 @@ use crate::cli::config::{config_execute_with_args, ConfigArgs};
 use crate::cli::daemon::{daemon_execute_with_args, DaemonArgs};
 use crate::cli::install::{install_execute_with_args, InstallArgs};
 use crate::cli::internal::{internal_execute_with_args, InternalArgs};
+use crate::daemon::interface::DaemonExecutionOptions;
 use crate::log::init_env_logger;
 use log::trace;
 use serde::{Deserialize, Serialize};
@@ -56,6 +57,17 @@ pub struct GlobalOptions {
     #[arg(long, default_value = "false", global = true)]
     #[serde(default = "true_")]
     pub ignore_build_id_mismatch: bool,
+}
+
+impl From<&GlobalOptions> for DaemonExecutionOptions {
+    fn from(value: &GlobalOptions) -> Self {
+        Self {
+            config_file: value.config_file.clone(),
+            cache_dir: value.cache_dir.clone(),
+            socket_dir: value.socket_dir.clone(),
+            ignore_build_id_mismatch: value.ignore_build_id_mismatch,
+        }
+    }
 }
 
 const fn true_() -> bool {

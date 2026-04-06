@@ -1,17 +1,15 @@
-use crate::cli::GlobalOptions;
-use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-#[derive(Parser, Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DaemonFormatArgs {
     /// Path to format
     pub path: PathBuf,
     pub content: String,
 }
 
-#[derive(Parser, Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DaemonBulkFormatArgs {
     /// Paths to format
     pub paths: Vec<PathBuf>,
@@ -19,7 +17,7 @@ pub struct DaemonBulkFormatArgs {
     pub threads: usize,
 }
 
-#[derive(Parser, Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonCommands {
     Format(DaemonFormatArgs),
     BulkFormat(DaemonBulkFormatArgs),
@@ -27,11 +25,19 @@ pub enum DaemonCommands {
     Ping,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct DaemonExecutionOptions {
+    pub config_file: Option<PathBuf>,
+    pub cache_dir: Option<PathBuf>,
+    pub socket_dir: Option<PathBuf>,
+    pub ignore_build_id_mismatch: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DaemonCommandPayload {
     pub command: DaemonCommands,
     pub current_dir: PathBuf,
-    pub global_options: GlobalOptions,
+    pub execution_options: DaemonExecutionOptions,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
