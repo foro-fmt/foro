@@ -1,5 +1,5 @@
 use anyhow::Result;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use std::time::SystemTime;
 use std::{fs, io, path::Path, path::PathBuf, thread, time::Duration};
 
@@ -33,7 +33,7 @@ impl StartupLock {
                     match taken_lock_started {
                         None => {
                             taken_lock_started = Some(path.metadata()?.modified()?);
-                            debug!("startup-lock held, waiting...");
+                            info!("startup-lock held, waiting...");
                         }
                         Some(t) => {
                             if t.elapsed()? > STARTUP_LOCK_STALE_TIMEOUT {
