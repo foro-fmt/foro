@@ -159,6 +159,10 @@ impl TestEnv {
     }
 }
 
+pub fn uv_available() -> bool {
+    Command::new("uv").arg("--version").output().is_ok()
+}
+
 impl Default for TestEnv {
     fn default() -> Self {
         Self::new()

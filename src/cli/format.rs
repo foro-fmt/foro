@@ -2,7 +2,8 @@ use crate::cli::GlobalOptions;
 use crate::config::load_paths;
 use crate::daemon::client::{ensure_daemon_running, run_command as daemon_run_command};
 use crate::daemon::interface::{
-    DaemonBulkFormatArgs, DaemonCommands, DaemonFormatArgs, DaemonSocketPath,
+    DaemonBulkFormatArgs, DaemonCommands, DaemonExecutionOptions, DaemonFormatArgs,
+    DaemonSocketPath,
 };
 use anyhow::Result;
 use clap::Parser;
@@ -26,8 +27,9 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
     )?;
 
     let socket = DaemonSocketPath::from_socket_dir(&socket_dir);
+    let daemon_options = DaemonExecutionOptions::from(&global_options);
 
-    ensure_daemon_running(&socket, &global_options)?;
+    ensure_daemon_running(&socket, &daemon_options)?;
 
     // If only one path is given and it's a file, use Format command
     if args.paths.len() == 1 && args.paths[0].is_file() {
@@ -37,7 +39,7 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
                 path: args.paths[0].clone(),
                 content,
             }),
-            global_options,
+            daemon_options,
             &socket,
             false,
         )?;
@@ -54,7 +56,7 @@ pub fn format_execute_with_args(args: FormatArgs, global_options: GlobalOptions)
                 paths: args.paths,
                 threads,
             }),
-            global_options,
+            daemon_options,
             &socket,
             true,
         )?;

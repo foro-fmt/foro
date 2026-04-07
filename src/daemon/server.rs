@@ -1,12 +1,11 @@
 use crate::app_dir::{AppDirResolver, DefaultAppDirResolver};
 use crate::bulk_format::{bulk_format, BulkFormatOption};
-use crate::cli::GlobalOptions;
 use crate::config::{load_config_and_cache, read_config_bytes};
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
-    DaemonBulkFormatArgs, DaemonBulkFormatResponse, DaemonCommandPayload, DaemonCommands,
-    DaemonFormatArgs, DaemonFormatResponse, DaemonInfo, DaemonResponse, DaemonSocketPath,
-    OutputPath,
+    BulkFormatSummary, DaemonBulkFormatArgs, DaemonBulkFormatResponse, DaemonCommandPayload,
+    DaemonCommands, DaemonExecutionOptions, DaemonFormatArgs, DaemonFormatResponse, DaemonInfo,
+    DaemonResponse, DaemonSocketPath, OutputPath,
 };
 use crate::daemon::startup_lock::StartupLock;
 use crate::daemon::uds::{UnixListener, UnixStream};
@@ -39,14 +38,14 @@ static DAEMON_INFO: OnceLock<DaemonInfo> = OnceLock::new();
 pub fn daemon_format_execute_with_args(
     args: DaemonFormatArgs,
     current_dir: PathBuf,
-    global_options: GlobalOptions,
+    execution_options: DaemonExecutionOptions,
 ) -> Result<DaemonFormatResponse> {
     let target_path = current_dir.join(&args.path).canonicalize()?;
 
-    let config_bytes = read_config_bytes(global_options.config_file.as_deref())?;
+    let config_bytes = read_config_bytes(execution_options.config_file.as_deref())?;
     let (config, cache_dir) = load_config_and_cache(
-        global_options.config_file.as_deref(),
-        global_options.cache_dir.as_deref(),
+        execution_options.config_file.as_deref(),
+        execution_options.cache_dir.as_deref(),
     )?;
     check_ready(&config_bytes, &cache_dir)
         .context("Plugins not installed: run `foro install` first")?;
@@ -95,7 +94,7 @@ pub fn daemon_format_execute_with_args(
 pub fn daemon_bulk_format_execute_with_args(
     args: DaemonBulkFormatArgs,
     current_dir: PathBuf,
-    global_options: GlobalOptions,
+    execution_options: DaemonExecutionOptions,
 ) -> Result<DaemonBulkFormatResponse> {
     let paths = args
         .paths
@@ -108,10 +107,10 @@ pub fn daemon_bulk_format_execute_with_args(
         })
         .collect::<Result<Vec<PathBuf>>>()?;
 
-    let config_bytes = read_config_bytes(global_options.config_file.as_deref())?;
+    let config_bytes = read_config_bytes(execution_options.config_file.as_deref())?;
     let (config, cache_dir) = load_config_and_cache(
-        global_options.config_file.as_deref(),
-        global_options.cache_dir.as_deref(),
+        execution_options.config_file.as_deref(),
+        execution_options.cache_dir.as_deref(),
     )?;
     check_ready(&config_bytes, &cache_dir)
         .context("Plugins not installed: run `foro install` first")?;
@@ -123,21 +122,14 @@ pub fn daemon_bulk_format_execute_with_args(
         current_dir,
     };
 
-    let (changed_count, unchanged_count) = bulk_format(&opt, &config, &cache_dir, true)?;
-    let total_count = changed_count + unchanged_count;
-
-    let message = if changed_count > 0 {
-        format!(
-            "{} files processed. {} {} changed.",
-            total_count,
-            changed_count,
-            if changed_count == 1 { "file" } else { "files" }
-        )
-    } else {
-        format!("{total_count} files processed. No files changed.")
-    };
-
-    Ok(DaemonBulkFormatResponse::Success(message))
+    let summary = bulk_format(&opt, &config, &cache_dir, true)?;
+    Ok(DaemonBulkFormatResponse::Success(BulkFormatSummary {
+        total_count: summary.processed_count(),
+        changed_count: summary.changed_count,
+        unchanged_count: summary.unchanged_count,
+        ignored_count: summary.ignored_count,
+        error_count: summary.error_count,
+    }))
 }
 
 pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse {
@@ -146,7 +138,7 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
             let res = daemon_format_execute_with_args(
                 s_args,
                 payload.current_dir,
-                payload.global_options,
+                payload.execution_options,
             );
 
             match res {
@@ -158,7 +150,7 @@ pub fn serverside_exec_command(payload: DaemonCommandPayload) -> DaemonResponse 
             let res = daemon_bulk_format_execute_with_args(
                 s_args,
                 payload.current_dir,
-                payload.global_options,
+                payload.execution_options,
             );
 
             match res {

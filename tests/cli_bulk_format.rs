@@ -1,6 +1,7 @@
 mod common;
 
-use crate::common::TestEnvBuilder;
+use crate::common::{uv_available, TestEnvBuilder};
+use assert_cmd::prelude::*;
 
 #[test]
 fn test_cli_bulk_format_basic() {
@@ -77,13 +78,27 @@ fn test_cli_bulk_format_multiple_paths() {
 }
 
 #[test]
+#[cfg_attr(target_os = "windows", ignore = "CommandIO is unsupported on Windows")]
 fn test_cli_bulk_format_no_rule_match() {
+    if !uv_available() {
+        eprintln!("skipping test_cli_bulk_format_no_rule_match: uv is not available");
+        return;
+    }
+
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/no_rule_match/")
         .work_dir("./input/")
         .build();
 
-    env.foro(&["format", "."]);
+    let output = env.foro_cmd(&["format", "."]).unwrap();
+    assert!(output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("2 files processed."));
+    assert!(stderr.contains("1 changed"));
+    assert!(stderr.contains("0 unchanged"));
+    assert!(stderr.contains("1 ignored"));
+    assert!(stderr.contains("0 errors"));
+
     env.assert_eq("input/main.rs", "expected/main.rs");
     // .txt has no matching rule, so it should be left untouched
     env.assert_eq("input/readme.txt", "expected/readme.txt");
@@ -100,4 +115,25 @@ fn test_cli_bulk_format_foro_ignore_glob() {
     env.assert_eq("input/main.rs", "expected/main.rs");
     // *.generated.rs should be excluded by .foro-ignore glob pattern
     env.assert_eq("input/types.generated.rs", "expected/types.generated.rs");
+}
+
+#[test]
+#[cfg_attr(target_os = "windows", ignore = "CommandIO is unsupported on Windows")]
+fn test_cli_bulk_format_error_count() {
+    let env = TestEnvBuilder::new()
+        .fixture_path("./tests/fixtures/cli_bulk_format/error_count/")
+        .work_dir("./input/")
+        .build();
+
+    let output = env.foro_cmd(&["format", "."]).unwrap();
+    assert!(output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("1 files processed."));
+    assert!(stderr.contains("0 changed"));
+    assert!(stderr.contains("0 unchanged"));
+    assert!(stderr.contains("0 ignored"));
+    assert!(stderr.contains("1 error"));
+
+    // File should stay untouched because formatter execution failed.
+    env.assert_eq("input/main.txt", "expected/main.txt");
 }

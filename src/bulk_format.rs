@@ -3,7 +3,7 @@ use crate::debug_long;
 use crate::handle_plugin::run::run;
 use crate::log::DAEMON_THREAD_START;
 use crate::path_utils::{normalize_path, to_wasm_path};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use foro_plugin_utils::data_json_utils::JsonGetter;
 use ignore::overrides::OverrideBuilder;
 use ignore::{WalkBuilder, WalkState};
@@ -24,17 +24,40 @@ pub struct BulkFormatOption {
     pub current_dir: PathBuf,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BulkFormatSummary {
+    pub changed_count: usize,
+    pub unchanged_count: usize,
+    pub ignored_count: usize,
+    pub error_count: usize,
+}
+
+impl BulkFormatSummary {
+    pub fn processed_count(&self) -> usize {
+        self.changed_count + self.unchanged_count + self.ignored_count + self.error_count
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FormatFileOutcome {
+    Changed,
+    Unchanged,
+    Ignored,
+}
+
 fn format_file(
     path: &Path,
     current_dir: &Path,
     config: &Config,
     cache_path: &Path,
     use_cache: bool,
-) -> Result<bool> {
-    // Return type changed to bool: true indicates the file was changed
+) -> Result<FormatFileOutcome> {
     info!("Formatting: {:?}", path);
 
-    let rule = config.find_matched_rule(path).context("No rule matched")?;
+    let Some(rule) = config.find_matched_rule(path) else {
+        info!("No rule matched, ignored: {:?}", path);
+        return Ok(FormatFileOutcome::Ignored);
+    };
 
     debug_long!("run rule: {:?}", rule);
 
@@ -61,19 +84,40 @@ fn format_file(
 
     debug_long!("{:?}", res);
 
-    let was_changed = if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
-        formatted != content // Check if content has changed by comparing with original
+    if let Some(status) = String::get_value_opt(&res, ["format-status"]) {
+        match status.as_str() {
+            "ignored" => {
+                info!("File ignored by formatter: {:?}", path);
+                return Ok(FormatFileOutcome::Ignored);
+            }
+            "error" => {
+                return Err(match String::get_value_opt(&res, ["format-error"]) {
+                    Some(format_error) => {
+                        anyhow!("File formatting failed for {:?}: {}", path, format_error)
+                    }
+                    None => anyhow!(
+                        "Formatter plugin returned format-status=error without format-error for {:?}",
+                        path
+                    ),
+                });
+            }
+            _ => {}
+        }
+    }
+
+    let outcome = if let Some(formatted) = String::get_value_opt(&res, ["formatted-content"]) {
+        if formatted != content {
+            FormatFileOutcome::Changed
+        } else {
+            FormatFileOutcome::Unchanged
+        }
     } else {
-        false // Consider unchanged if no formatted content is available
+        FormatFileOutcome::Unchanged
     };
 
-    info!(
-        "Success to format: {:?} ({})",
-        path,
-        if was_changed { "changed" } else { "unchanged" }
-    );
+    info!("Successfully formatted: {:?} ({:?})", path, outcome);
 
-    Ok(was_changed) // Return whether the file was changed
+    Ok(outcome)
 }
 
 pub fn bulk_format(
@@ -81,8 +125,7 @@ pub fn bulk_format(
     config: &Config,
     cache_path: &Path,
     use_cache: bool,
-) -> Result<(usize, usize)> {
-    // Returns (count of changed files, count of unchanged files)
+) -> Result<BulkFormatSummary> {
     let (fst, rest) = opt.paths.split_first().context("No path given")?;
     let worker_count = opt.threads.max(1);
 
@@ -118,14 +161,18 @@ pub fn bulk_format(
     let (work_tx, work_rx) = mpsc::sync_channel::<PathBuf>(queue_capacity);
     let work_rx = Arc::new(Mutex::new(work_rx));
     let mut workers = Vec::with_capacity(worker_count);
-    let changed_count = Arc::new(AtomicUsize::new(0)); // Count of files that were changed
-    let unchanged_count = Arc::new(AtomicUsize::new(0)); // Count of files that were not changed
+    let changed_count = Arc::new(AtomicUsize::new(0));
+    let unchanged_count = Arc::new(AtomicUsize::new(0));
+    let ignored_count = Arc::new(AtomicUsize::new(0));
+    let error_count = Arc::new(AtomicUsize::new(0));
 
     for _ in 0..worker_count {
         let config = config.clone();
         let cache_path = cache_path.to_path_buf();
         let changed_count = changed_count.clone();
         let unchanged_count = unchanged_count.clone();
+        let ignored_count = ignored_count.clone();
+        let error_count = error_count.clone();
         let work_rx = work_rx.clone();
 
         workers.push(thread::spawn(move || {
@@ -153,15 +200,18 @@ pub fn bulk_format(
                 );
 
                 match res {
-                    Ok(was_changed) => {
-                        if was_changed {
-                            changed_count.fetch_add(1, Ordering::SeqCst);
-                        } else {
-                            unchanged_count.fetch_add(1, Ordering::SeqCst);
-                        }
+                    Ok(FormatFileOutcome::Changed) => {
+                        changed_count.fetch_add(1, Ordering::SeqCst);
+                    }
+                    Ok(FormatFileOutcome::Unchanged) => {
+                        unchanged_count.fetch_add(1, Ordering::SeqCst);
+                    }
+                    Ok(FormatFileOutcome::Ignored) => {
+                        ignored_count.fetch_add(1, Ordering::SeqCst);
                     }
                     Err(err) => {
-                        error!("Error formatting file: {}", err);
+                        error_count.fetch_add(1, Ordering::SeqCst);
+                        error!("Error formatting file {}: {err:#}", path.display());
                     }
                 }
             }
@@ -169,8 +219,10 @@ pub fn bulk_format(
     }
 
     let walk_tx = work_tx.clone();
+    let walk_error_count = error_count.clone();
     walk.run(move || {
         let work_tx = walk_tx.clone();
+        let error_count = walk_error_count.clone();
         Box::new(move |entry_res| {
             match entry_res {
                 Ok(dir_entry) => {
@@ -181,10 +233,12 @@ pub fn bulk_format(
                     }
 
                     if let Err(err) = work_tx.send(path) {
+                        error_count.fetch_add(1, Ordering::SeqCst);
                         error!("Error scheduling file: {}", err);
                     }
                 }
                 Err(err) => {
+                    error_count.fetch_add(1, Ordering::SeqCst);
                     error!("Error reading entry: {}", err);
                 }
             }
@@ -199,8 +253,10 @@ pub fn bulk_format(
         worker.join().unwrap();
     }
 
-    Ok((
-        changed_count.load(Ordering::SeqCst),
-        unchanged_count.load(Ordering::SeqCst),
-    ))
+    Ok(BulkFormatSummary {
+        changed_count: changed_count.load(Ordering::SeqCst),
+        unchanged_count: unchanged_count.load(Ordering::SeqCst),
+        ignored_count: ignored_count.load(Ordering::SeqCst),
+        error_count: error_count.load(Ordering::SeqCst),
+    })
 }
