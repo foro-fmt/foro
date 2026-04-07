@@ -47,9 +47,16 @@ pub enum DaemonFormatResponse {
     Error(String),
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BulkFormatSummary {
+    pub total_count: usize,
+    pub changed_count: usize,
+    pub unchanged_count: usize,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub enum DaemonBulkFormatResponse {
-    Success(String),
+    Success(BulkFormatSummary),
     Error(String),
 }
 
