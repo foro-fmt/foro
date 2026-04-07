@@ -4,9 +4,8 @@ use crate::config::{load_config_and_cache, read_config_bytes};
 use crate::daemon::client::ping;
 use crate::daemon::interface::{
     BulkFormatSummary, DaemonBulkFormatArgs, DaemonBulkFormatResponse, DaemonCommandPayload,
-    DaemonCommands,
-    DaemonExecutionOptions, DaemonFormatArgs, DaemonFormatResponse, DaemonInfo, DaemonResponse,
-    DaemonSocketPath, OutputPath,
+    DaemonCommands, DaemonExecutionOptions, DaemonFormatArgs, DaemonFormatResponse, DaemonInfo,
+    DaemonResponse, DaemonSocketPath, OutputPath,
 };
 use crate::daemon::startup_lock::StartupLock;
 use crate::daemon::uds::{UnixListener, UnixStream};

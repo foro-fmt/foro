@@ -16,6 +16,18 @@ fn test_cli_bulk_format_basic() {
 }
 
 #[test]
+fn test_cli_bulk_format_single_thread() {
+    let env = TestEnvBuilder::new()
+        .fixture_path("./tests/fixtures/cli_bulk_format/basic/")
+        .work_dir("./input/")
+        .build();
+
+    env.foro(&["format", ".", "--threads", "1"]);
+    env.assert_eq("input/a.rs", "expected/a.rs");
+    env.assert_eq("input/b.rs", "expected/b.rs");
+}
+
+#[test]
 fn test_cli_bulk_format_subdirectory() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/subdirectory/")
