@@ -242,20 +242,21 @@ pub fn run_command(
 }
 
 fn format_bulk_success_message(summary: BulkFormatSummary) -> String {
-    if summary.changed_count > 0 {
-        format!(
-            "{} files processed. {} {} changed.",
-            summary.total_count,
-            summary.changed_count,
-            if summary.changed_count == 1 {
-                "file"
-            } else {
-                "files"
-            }
-        )
+    let error_label = if summary.error_count == 1 {
+        "error"
     } else {
-        format!("{} files processed. No files changed.", summary.total_count)
-    }
+        "errors"
+    };
+
+    format!(
+        "{} files processed. {} changed, {} unchanged, {} ignored, {} {}.",
+        summary.total_count,
+        summary.changed_count,
+        summary.unchanged_count,
+        summary.ignored_count,
+        summary.error_count,
+        error_label
+    )
 }
 
 #[cfg(test)]
@@ -269,11 +270,13 @@ mod tests {
             total_count: 3,
             changed_count: 0,
             unchanged_count: 3,
+            ignored_count: 0,
+            error_count: 0,
         };
 
         assert_eq!(
             format_bulk_success_message(summary),
-            "3 files processed. No files changed."
+            "3 files processed. 0 changed, 3 unchanged, 0 ignored, 0 errors."
         );
     }
 
@@ -283,11 +286,13 @@ mod tests {
             total_count: 3,
             changed_count: 2,
             unchanged_count: 1,
+            ignored_count: 0,
+            error_count: 0,
         };
 
         assert_eq!(
             format_bulk_success_message(summary),
-            "3 files processed. 2 files changed."
+            "3 files processed. 2 changed, 1 unchanged, 0 ignored, 0 errors."
         );
     }
 
@@ -297,11 +302,13 @@ mod tests {
             total_count: 5,
             changed_count: 1,
             unchanged_count: 4,
+            ignored_count: 0,
+            error_count: 0,
         };
 
         assert_eq!(
             format_bulk_success_message(summary),
-            "5 files processed. 1 file changed."
+            "5 files processed. 1 changed, 4 unchanged, 0 ignored, 0 errors."
         );
     }
 }

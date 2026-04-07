@@ -123,12 +123,13 @@ pub fn daemon_bulk_format_execute_with_args(
         current_dir,
     };
 
-    let (changed_count, unchanged_count) = bulk_format(&opt, &config, &cache_dir, true)?;
-
+    let summary = bulk_format(&opt, &config, &cache_dir, true)?;
     Ok(DaemonBulkFormatResponse::Success(BulkFormatSummary {
-        total_count: changed_count + unchanged_count,
-        changed_count,
-        unchanged_count,
+        total_count: summary.processed_count(),
+        changed_count: summary.changed_count,
+        unchanged_count: summary.unchanged_count,
+        ignored_count: summary.ignored_count,
+        error_count: summary.error_count,
     }))
 }
 

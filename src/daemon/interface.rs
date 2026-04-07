@@ -52,6 +52,8 @@ pub struct BulkFormatSummary {
     pub total_count: usize,
     pub changed_count: usize,
     pub unchanged_count: usize,
+    pub ignored_count: usize,
+    pub error_count: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
