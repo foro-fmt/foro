@@ -114,7 +114,8 @@ pub fn bulk_format(
 
     let parent_start_time = DAEMON_THREAD_START.with(|start| *start.get_or_init(Instant::now));
 
-    let (work_tx, work_rx) = mpsc::channel::<PathBuf>();
+    let queue_capacity = worker_count.saturating_mul(2).max(1);
+    let (work_tx, work_rx) = mpsc::sync_channel::<PathBuf>(queue_capacity);
     let work_rx = Arc::new(Mutex::new(work_rx));
     let mut workers = Vec::with_capacity(worker_count);
     let changed_count = Arc::new(AtomicUsize::new(0)); // Count of files that were changed
