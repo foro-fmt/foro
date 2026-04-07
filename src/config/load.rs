@@ -335,7 +335,7 @@ mod tests {
         let written_config = fs::read_to_string(&config_file_path)?;
         assert_eq!(written_config, default_config_str());
         assert_eq!(used_cache_dir, cache_dir_path);
-        assert_eq!(config.rules.len(), 5);
+        assert_eq!(config.rules.len(), 6);
 
         Ok(())
     }

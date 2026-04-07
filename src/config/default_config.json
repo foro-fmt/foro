@@ -21,6 +21,10 @@
 		{
 			"on": [".c", ".cpp", ".h", ".hpp"],
 			"cmd": "https://github.com/foro-fmt/foro-clang-format/releases/download/22.1.1-1/foro-clang-format.dllpack"
+		},
+		{
+			"on": ".toml",
+			"cmd": "https://github.com/foro-fmt/foro-tombi/releases/download/0.3.55/foro-tombi.dllpack"
 		}
 	]
 }
