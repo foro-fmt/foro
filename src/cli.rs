@@ -12,12 +12,12 @@ mod internal;
 
 use format::*;
 
+use crate::build_info;
 use crate::cli::cache::{cache_execute_with_args, CacheArgs};
 use crate::cli::config::{config_execute_with_args, ConfigArgs};
 use crate::cli::daemon::{daemon_execute_with_args, DaemonArgs};
 use crate::cli::install::{install_execute_with_args, InstallArgs};
 use crate::cli::internal::{internal_execute_with_args, InternalArgs};
-use crate::build_info;
 use crate::daemon::interface::DaemonExecutionOptions;
 use crate::log::init_env_logger;
 use log::trace;
