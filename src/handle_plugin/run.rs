@@ -145,6 +145,14 @@ fn run_plugin(
     run_plugin_inner(&mut lib, cur_json)
 }
 
+#[cfg(any(windows, test))]
+const COMMAND_IO_WINDOWS_ERROR_MESSAGE: &str = "CommandIO is not supported on Windows";
+
+#[cfg(windows)]
+fn command_io_windows_error() -> anyhow::Error {
+    anyhow!(COMMAND_IO_WINDOWS_ERROR_MESSAGE)
+}
+
 fn run_inner_command(
     command: &Command,
     mut cur_json: Value,
@@ -165,17 +173,18 @@ fn run_inner_command(
             Ok(cur_json)
         }
         Command::CommandIO { io: cmd } => {
-            let env = minijinja::Environment::new();
-            let rendered_cmd = env.render_str(cmd, &cur_json)?;
+            #[cfg(windows)]
+            {
+                let _ = cmd;
+                return Err(command_io_windows_error());
+            }
 
-            if cfg!(target_os = "windows") {
-                // memo: we can use https://github.com/chipsenkbeil/winsplit-rs
-                todo!("Windows is not supported yet")
-            } else {
-                #[cfg(unix)]
+            #[cfg(not(windows))]
+            {
+                let env = minijinja::Environment::new();
+                let rendered_cmd = env.render_str(cmd, &cur_json)?;
+
                 let words = shell_words::split(&rendered_cmd)?;
-                #[cfg(windows)]
-                let words = winsplit::split(&rendered_cmd);
 
                 let (exec, args) = words.split_first().context("Empty command")?;
                 let _target_path = String::get_value(&cur_json, ["os-target"])?;
@@ -228,7 +237,7 @@ fn run_inner_command(
                     cur_json_m.insert("format-status".to_string(), json!("error"));
                     cur_json_m.insert("format-error".to_string(), json!(buf));
                 }
-            };
+            }
 
             Ok(cur_json)
         }
@@ -335,4 +344,17 @@ pub fn run(
     debug_long!("data-json: {:?}", &res);
 
     Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::COMMAND_IO_WINDOWS_ERROR_MESSAGE;
+
+    #[test]
+    fn command_io_windows_error_has_clear_message() {
+        assert_eq!(
+            COMMAND_IO_WINDOWS_ERROR_MESSAGE,
+            "CommandIO is not supported on Windows"
+        );
+    }
 }
