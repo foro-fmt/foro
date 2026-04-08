@@ -146,8 +146,11 @@ fn run_plugin(
 }
 
 #[cfg(any(windows, test))]
+const COMMAND_IO_WINDOWS_ERROR_MESSAGE: &str = "CommandIO is not supported on Windows";
+
+#[cfg(windows)]
 fn command_io_windows_error() -> anyhow::Error {
-    anyhow!("CommandIO is not supported on Windows")
+    anyhow!(COMMAND_IO_WINDOWS_ERROR_MESSAGE)
 }
 
 fn run_inner_command(
@@ -181,10 +184,7 @@ fn run_inner_command(
                 let env = minijinja::Environment::new();
                 let rendered_cmd = env.render_str(cmd, &cur_json)?;
 
-                #[cfg(unix)]
                 let words = shell_words::split(&rendered_cmd)?;
-                #[cfg(windows)]
-                let words = winsplit::split(&rendered_cmd);
 
                 let (exec, args) = words.split_first().context("Empty command")?;
                 let _target_path = String::get_value(&cur_json, ["os-target"])?;
@@ -241,19 +241,6 @@ fn run_inner_command(
 
             Ok(cur_json)
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::command_io_windows_error;
-
-    #[test]
-    fn command_io_windows_error_has_clear_message() {
-        assert_eq!(
-            command_io_windows_error().to_string(),
-            "CommandIO is not supported on Windows"
-        );
     }
 }
 
@@ -357,4 +344,17 @@ pub fn run(
     debug_long!("data-json: {:?}", &res);
 
     Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::COMMAND_IO_WINDOWS_ERROR_MESSAGE;
+
+    #[test]
+    fn command_io_windows_error_has_clear_message() {
+        assert_eq!(
+            COMMAND_IO_WINDOWS_ERROR_MESSAGE,
+            "CommandIO is not supported on Windows"
+        );
+    }
 }
