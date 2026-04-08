@@ -264,6 +264,7 @@ jobs:
       - name: Create GitHub Release
         env:
           PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
+          ANNOUNCEMENT_BODY: "${{ fromJson(steps.host.outputs.manifest).announcement_github_body }}"
           RELEASE_COMMIT: "${{ github.sha }}"
         run: |
           if [ ! -s RELEASE_NOTES.md ] || grep -qi "TODO\|placeholder" RELEASE_NOTES.md; then
@@ -278,7 +279,10 @@ jobs:
             exit 1
           fi
 
-          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "${{ needs.plan.outputs.tag }}" --notes-file RELEASE_NOTES.md artifacts/*
+          cat RELEASE_NOTES.md > $RUNNER_TEMP/notes.txt
+          printf '\n\n---\n\n%s' "$ANNOUNCEMENT_BODY" >> $RUNNER_TEMP/notes.txt
+
+          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "${{ needs.plan.outputs.tag }}" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
 
   announce:
     needs:
