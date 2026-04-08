@@ -46,9 +46,9 @@ fn test_cli_install_idempotent() {
     env.foro(&["install"]); // 2回目もエラーにならない
 }
 
-/// config 変更後は再 install が必要か
+/// 空白だけの config 変更では再 install は不要か
 #[test]
-fn test_cli_install_config_change_invalidates_marker() {
+fn test_cli_install_whitespace_change_keeps_marker_valid() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_install/")
         .cache_dir("cache")
@@ -60,19 +60,13 @@ fn test_cli_install_config_change_invalidates_marker() {
     let out = env.foro_cmd(&["format", "main.rs"]).output().unwrap();
     assert!(out.status.success());
 
-    // config を別の内容に書き換える
-    // 内容は同じだが bytes が違う（スペース追加）→ ハッシュが変わりマーカー無効化
+    // 空白だけ変更する。依存 URL 集合は同じなので、再 install は不要なはず。
     std::fs::write(env.config_file.path(), b"{ \"rules\": [] }\n").unwrap();
 
-    // format が再びエラーになるか
+    // 依存関係が変わっていないので、そのまま format できるはず。
     let out = env.foro_cmd(&["format", "main.rs"]).output().unwrap();
     assert!(
-        !out.status.success(),
-        "format should fail after config change"
-    );
-    let stderr = String::from_utf8(out.stderr).unwrap();
-    assert!(
-        stderr.contains("foro install"),
-        "error should mention `foro install`, got: {stderr}"
+        out.status.success(),
+        "format should still succeed after whitespace-only config change"
     );
 }
