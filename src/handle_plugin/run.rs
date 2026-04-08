@@ -145,6 +145,11 @@ fn run_plugin(
     run_plugin_inner(&mut lib, cur_json)
 }
 
+#[cfg(any(windows, test))]
+fn command_io_windows_error() -> anyhow::Error {
+    anyhow!("CommandIO is not supported on Windows")
+}
+
 fn run_inner_command(
     command: &Command,
     mut cur_json: Value,
@@ -165,13 +170,17 @@ fn run_inner_command(
             Ok(cur_json)
         }
         Command::CommandIO { io: cmd } => {
-            let env = minijinja::Environment::new();
-            let rendered_cmd = env.render_str(cmd, &cur_json)?;
+            #[cfg(windows)]
+            {
+                let _ = cmd;
+                return Err(command_io_windows_error());
+            }
 
-            if cfg!(target_os = "windows") {
-                // memo: we can use https://github.com/chipsenkbeil/winsplit-rs
-                todo!("Windows is not supported yet")
-            } else {
+            #[cfg(not(windows))]
+            {
+                let env = minijinja::Environment::new();
+                let rendered_cmd = env.render_str(cmd, &cur_json)?;
+
                 #[cfg(unix)]
                 let words = shell_words::split(&rendered_cmd)?;
                 #[cfg(windows)]
@@ -228,10 +237,23 @@ fn run_inner_command(
                     cur_json_m.insert("format-status".to_string(), json!("error"));
                     cur_json_m.insert("format-error".to_string(), json!(buf));
                 }
-            };
+            }
 
             Ok(cur_json)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::command_io_windows_error;
+
+    #[test]
+    fn command_io_windows_error_has_clear_message() {
+        assert_eq!(
+            command_io_windows_error().to_string(),
+            "CommandIO is not supported on Windows"
+        );
     }
 }
 
