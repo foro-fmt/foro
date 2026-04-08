@@ -3,7 +3,9 @@
 use assert_cmd::prelude::*;
 use assert_fs::fixture::ChildPath;
 use assert_fs::prelude::*;
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -16,7 +18,9 @@ impl Cache {
     pub fn path(&self) -> PathBuf {
         match self {
             Cache::TempCache(path) => path.path().to_path_buf(),
-            Cache::GlobalCache => PathBuf::from(env!("TARGET_DIR")).join("foro-test-cache"),
+            Cache::GlobalCache => PathBuf::from(env!("TARGET_DIR"))
+                .join("foro-test-cache")
+                .join(worktree_cache_suffix()),
         }
     }
 
@@ -25,6 +29,12 @@ impl Cache {
             fs::create_dir_all(self.path()).unwrap();
         }
     }
+}
+
+fn worktree_cache_suffix() -> String {
+    let mut hasher = DefaultHasher::new();
+    env!("CARGO_MANIFEST_DIR").hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
 }
 
 enum CacheKind {

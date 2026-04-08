@@ -1,9 +1,10 @@
 mod common;
 
 use crate::common::{uv_available, TestEnvBuilder};
-use assert_cmd::prelude::*;
+use serial_test::serial;
 
 #[test]
+#[serial]
 fn test_cli_bulk_format_basic() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/basic/")
@@ -16,6 +17,7 @@ fn test_cli_bulk_format_basic() {
 }
 
 #[test]
+#[serial]
 fn test_cli_bulk_format_single_thread() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/basic/")
@@ -28,6 +30,7 @@ fn test_cli_bulk_format_single_thread() {
 }
 
 #[test]
+#[serial]
 fn test_cli_bulk_format_subdirectory() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/subdirectory/")
@@ -40,6 +43,7 @@ fn test_cli_bulk_format_subdirectory() {
 }
 
 #[test]
+#[serial]
 fn test_cli_bulk_format_foro_ignore() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/foro_ignore/")
@@ -53,6 +57,7 @@ fn test_cli_bulk_format_foro_ignore() {
 }
 
 #[test]
+#[serial]
 fn test_cli_bulk_format_default_ignore() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/default_ignore/")
@@ -66,6 +71,7 @@ fn test_cli_bulk_format_default_ignore() {
 }
 
 #[test]
+#[serial]
 fn test_cli_bulk_format_multiple_paths() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/multiple_paths/")
@@ -78,6 +84,7 @@ fn test_cli_bulk_format_multiple_paths() {
 }
 
 #[test]
+#[serial]
 #[cfg_attr(target_os = "windows", ignore = "CommandIO is unsupported on Windows")]
 fn test_cli_bulk_format_no_rule_match() {
     if !uv_available() {
@@ -90,7 +97,8 @@ fn test_cli_bulk_format_no_rule_match() {
         .work_dir("./input/")
         .build();
 
-    let output = env.foro_cmd(&["format", "."]).unwrap();
+    let mut cmd = env.foro_cmd(&["format", "."]);
+    let output = std::process::Command::output(&mut cmd).unwrap();
     assert!(output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("2 files processed."));
@@ -105,6 +113,7 @@ fn test_cli_bulk_format_no_rule_match() {
 }
 
 #[test]
+#[serial]
 fn test_cli_bulk_format_foro_ignore_glob() {
     let env = TestEnvBuilder::new()
         .fixture_path("./tests/fixtures/cli_bulk_format/foro_ignore_glob/")
@@ -118,6 +127,7 @@ fn test_cli_bulk_format_foro_ignore_glob() {
 }
 
 #[test]
+#[serial]
 #[cfg_attr(target_os = "windows", ignore = "CommandIO is unsupported on Windows")]
 fn test_cli_bulk_format_error_count() {
     let env = TestEnvBuilder::new()
@@ -125,9 +135,11 @@ fn test_cli_bulk_format_error_count() {
         .work_dir("./input/")
         .build();
 
-    let output = env.foro_cmd(&["format", "."]).unwrap();
-    assert!(output.status.success());
+    let mut cmd = env.foro_cmd(&["format", "."]);
+    let output = std::process::Command::output(&mut cmd).unwrap();
+    assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("Formatted with errors:"));
     assert!(stderr.contains("1 files processed."));
     assert!(stderr.contains("0 changed"));
     assert!(stderr.contains("0 unchanged"));
