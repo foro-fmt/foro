@@ -1,7 +1,6 @@
 mod common;
 
 use crate::common::{uv_available, TestEnvBuilder};
-use assert_cmd::prelude::*;
 
 #[test]
 fn test_cli_bulk_format_basic() {
@@ -90,7 +89,8 @@ fn test_cli_bulk_format_no_rule_match() {
         .work_dir("./input/")
         .build();
 
-    let output = env.foro_cmd(&["format", "."]).unwrap();
+    let mut cmd = env.foro_cmd(&["format", "."]);
+    let output = std::process::Command::output(&mut cmd).unwrap();
     assert!(output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("2 files processed."));
@@ -125,9 +125,11 @@ fn test_cli_bulk_format_error_count() {
         .work_dir("./input/")
         .build();
 
-    let output = env.foro_cmd(&["format", "."]).unwrap();
-    assert!(output.status.success());
+    let mut cmd = env.foro_cmd(&["format", "."]);
+    let output = std::process::Command::output(&mut cmd).unwrap();
+    assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("Formatted with errors:"));
     assert!(stderr.contains("1 files processed."));
     assert!(stderr.contains("0 changed"));
     assert!(stderr.contains("0 unchanged"));

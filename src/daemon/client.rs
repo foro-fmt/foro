@@ -218,10 +218,13 @@ pub fn run_command(
             return Err(anyhow!(err));
         }
         DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Success(summary)) => {
-            eprintln!(
-                "Formatted successfully: {}",
-                format_bulk_success_message(summary)
-            );
+            let message = format_bulk_success_message(summary);
+
+            if summary.error_count == 0 {
+                eprintln!("Formatted successfully: {}", message);
+            } else {
+                return Err(anyhow!("Formatted with errors: {}", message));
+            }
         }
         DaemonResponse::BulkFormat(DaemonBulkFormatResponse::Error(err)) => {
             return Err(anyhow!(err));
