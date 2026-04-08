@@ -7,7 +7,7 @@ use crate::daemon::server::start_daemon;
 use crate::daemon::startup_lock::StartupLock;
 use crate::daemon::uds::UnixStream;
 use crate::process_utils::{get_start_time, is_alive};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use log::{debug, info, warn};
 use std::env::current_dir;
 use std::io::{ErrorKind, Write};
@@ -53,8 +53,27 @@ pub fn daemon_is_alive(socket: &DaemonSocketPath) -> Result<DaemonStatus> {
         Err(err) if err.kind() == ErrorKind::NotFound => return Ok(DaemonStatus::NotRunning),
         Err(err) => return Err(err.into()),
     };
-    let (pid, start_time, build_id) =
-        parse_info(&content).context("Failed to parse daemon info")?;
+    let (pid, start_time, build_id) = match parse_info(&content) {
+        Some(info) => info,
+        None => {
+            warn!(
+                "Ignoring malformed daemon info file: {}",
+                socket.info_path.display()
+            );
+
+            if let Err(err) = std::fs::remove_file(&socket.info_path) {
+                if err.kind() != ErrorKind::NotFound {
+                    warn!(
+                        "Failed to remove malformed daemon info file {}: {}",
+                        socket.info_path.display(),
+                        err
+                    );
+                }
+            }
+
+            return Ok(DaemonStatus::NotRunning);
+        }
+    };
 
     if !is_alive(pid) {
         return Ok(DaemonStatus::NotRunning);

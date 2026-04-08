@@ -2,6 +2,7 @@ mod common;
 
 use crate::common::TestEnv;
 use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
 use predicates::str::contains;
 use regex::Regex;
 
@@ -65,4 +66,21 @@ fn test_cli_daemon_lock() {
 
     assert!(proc_0.wait().unwrap().success());
     assert!(proc_1.wait().unwrap().success());
+}
+
+#[test]
+fn test_cli_daemon_start_recovers_from_malformed_info() {
+    let env = TestEnv::new();
+
+    env.foro(&["daemon", "stop"]);
+    env.socket_dir
+        .child("daemon-cmd.sock.info")
+        .write_str("not,a,daemon")
+        .unwrap();
+
+    let mut res = env.foro_cmd(&["daemon", "start"]);
+    res.assert().success().stderr(contains("Daemon started"));
+
+    let res = env.foro_stdout(&["daemon", "ping"]);
+    assert!(res.contains("pong!"));
 }
