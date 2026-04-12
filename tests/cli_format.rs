@@ -2,6 +2,7 @@ mod common;
 
 use crate::common::{TestEnv, TestEnvBuilder};
 use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
 
 #[test]
 fn test_cli_format_rust_basic() {
@@ -239,4 +240,18 @@ fn test_cli_format_parallel() {
 
     assert!(proc_0.wait().unwrap().success());
     assert!(proc_1.wait().unwrap().success());
+}
+
+#[test]
+fn test_cli_format_recovers_from_malformed_daemon_info() {
+    let env = TestEnv::new_fixture("./tests/fixtures/cli_format_rust/basic/");
+
+    env.foro(&["daemon", "stop"]);
+    env.socket_dir
+        .child("daemon-cmd.sock.info")
+        .write_str("not,a,daemon")
+        .unwrap();
+
+    env.foro(&["format", "./main.rs"]);
+    env.assert_eq("main.rs", "expected.rs");
 }
